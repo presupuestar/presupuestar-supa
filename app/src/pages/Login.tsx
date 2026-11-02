@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useSesion } from '../context/Sesion'
 import { Isotipo } from '../components/Isotipo'
 
@@ -36,6 +37,7 @@ export function Login() {
           <label>Contraseña
             <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="current-password" required />
           </label>
+          <Link className="link" to="/recuperar">¿Olvidaste tu contraseña?</Link>
           {error && <p className="error" role="alert">{error}</p>}
           <button className="btn" disabled={enviando}>{enviando ? 'Ingresando…' : 'Ingresar'}</button>
         </form>

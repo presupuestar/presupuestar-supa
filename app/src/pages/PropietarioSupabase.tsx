@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useSesion } from '../context/Sesion'
 import { Isotipo } from '../components/Isotipo'
 import { generarClave } from '../lib/clave'
@@ -115,6 +116,7 @@ export function PropietarioSupabase() {
             <h2>Ingresá con tu cuenta de Supabase</h2>
             <label>Correo electrónico<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
             <label>Contraseña<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+            <Link className="link" to="/recuperar">¿Olvidaste tu contraseña?</Link>
             {error && <p className="error" role="alert">{error}</p>}
             <button className="btn">Ingresar</button>
           </form>

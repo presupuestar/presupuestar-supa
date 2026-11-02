@@ -7,6 +7,8 @@ import { NuevoPresupuesto } from './pages/NuevoPresupuesto'
 import { Historial } from './pages/Historial'
 import { Equipo } from './pages/Equipo'
 import { PropietarioSupabase } from './pages/PropietarioSupabase'
+import { RecuperarClave } from './pages/RecuperarClave'
+import { RestablecerClave } from './pages/RestablecerClave'
 
 function Protegida({ children }: { children: React.ReactNode }) {
   const { usuario, cargando, salir } = useSesion()
@@ -31,6 +33,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/recuperar" element={<RecuperarClave />} />
+          <Route path="/restablecer" element={<RestablecerClave />} />
           <Route path="/" element={<Protegida><Inicio /></Protegida>} />
           <Route path="/catalogo" element={<Protegida><Catalogo /></Protegida>} />
           <Route path="/nuevo" element={<Protegida><NuevoPresupuesto /></Protegida>} />
