@@ -153,8 +153,9 @@ Deno.serve(async (request: Request) => {
       if (error) return json({ error: `No se pudieron eliminar los archivos de la empresa: ${error.message}` }, 400)
     }
     for (const member of members) {
-      const { data: owner } = await adminClient.from('platform_owners')
+      const { data: owner, error: ownerLookupError } = await adminClient.from('platform_owners')
         .select('user_id').eq('user_id', member.user_id).maybeSingle()
+      if (ownerLookupError) return json({ error: `No se pudo verificar el tipo de cuenta ${member.user_id}: ${ownerLookupError.message}` }, 400)
       if (!owner) {
         const { error } = await adminClient.auth.admin.deleteUser(member.user_id)
         if (error) return json({ error: `No se pudo eliminar un usuario de la empresa: ${error.message}` }, 400)

@@ -9,6 +9,7 @@ import { mensajeError } from '../lib/errores'
 import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { supabase } from '../lib/supabase'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import type { Empresa as EmpresaApp, Estado, Linea, Presupuesto } from '../lib/tipos'
 
 interface Company {
@@ -52,6 +53,21 @@ const tabs: [Tab, string][] = [
 
 async function platformAction(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('manage-platform', { body })
+  if (error instanceof FunctionsHttpError) {
+    const responseText = await error.context.clone().text()
+    if (responseText) {
+      let responseBody: unknown
+      try {
+        responseBody = JSON.parse(responseText)
+      } catch {
+        throw new Error(responseText)
+      }
+      if (responseBody && typeof responseBody === 'object' && 'error' in responseBody
+        && typeof responseBody.error === 'string') throw new Error(responseBody.error)
+      throw new Error(responseText)
+    }
+    throw new Error(`La función de administración respondió con el estado ${error.context.status}.`)
+  }
   if (error) throw error
   return data
 }
