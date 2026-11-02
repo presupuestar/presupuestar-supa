@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
+    "@supabase/supabase-js": "^2.118.0",
     "pdfjs-dist": "^6.4.299",
     "pocketbase": "^0.28.1",
     "react": "^19.3.0",
