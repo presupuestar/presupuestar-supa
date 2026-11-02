@@ -211,7 +211,7 @@ export function PropietarioSupabase() {
     catch (e) { setError(mensajeError(e, 'No se pudo iniciar sesión.')) }
   }
 
-  const salir = () => { void supabase.auth.signOut() }
+  const salir = () => { void supabase.auth.signOut({ scope: 'local' }) }
 
   const createCompany = async (event: FormEvent) => {
     event.preventDefault()

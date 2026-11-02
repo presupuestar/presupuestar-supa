@@ -61,7 +61,7 @@ export function RestablecerClave() {
     try {
       const { error: updateError } = await auth.auth.updateUser({ password: clave })
       if (updateError) throw updateError
-      await auth.auth.signOut()
+      await auth.auth.signOut({ scope: 'local' })
       navigate(propietario ? '/propietario' : '/login', { replace: true })
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo cambiar la contraseña.')

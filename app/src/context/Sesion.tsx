@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { supabase, supabasePropietario } from '../lib/supabase'
 import { repositorio } from '../lib/repositorio'
 import { aplicarTema, restablecerTema } from '../lib/tema'
 import type { Empresa, PermisoEmpresa } from '../lib/tipos'
@@ -59,9 +59,32 @@ export function SesionProvider({ children }: { children: ReactNode }) {
       }
       try {
         const perfil = await perfilDeUsuario(user)
+        if (perfil.rol === 'propietario') {
+          const [{ data: sesionEmpresa }, { data: sesionPropietario }] = await Promise.all([
+            supabase.auth.getSession(),
+            supabasePropietario.auth.getSession(),
+          ])
+          if (sesionEmpresa.session?.user.id === user.id) {
+            if (!sesionPropietario.session) {
+              const { error: transferenciaError } = await supabasePropietario.auth.setSession({
+                access_token: sesionEmpresa.session.access_token,
+                refresh_token: sesionEmpresa.session.refresh_token,
+              })
+              if (transferenciaError) throw transferenciaError
+            }
+            await supabase.auth.signOut({ scope: 'local' })
+          }
+          if (vigente) {
+            setUsuario(null)
+            setEmpresa(null)
+            restablecerTema()
+            setCargando(false)
+          }
+          return
+        }
         if (vigente) setUsuario(perfil)
       } catch (error) {
-        await supabase.auth.signOut()
+        await supabase.auth.signOut({ scope: 'local' })
         if (vigente) setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo cargar el perfil.')
       } finally {
         if (vigente) setCargando(false)
@@ -129,7 +152,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
     setUsuario({ ...usuario, primerAccesoClaveRespondido: true })
   }
 
-  const salir = () => { void supabase.auth.signOut() }
+  const salir = () => { void supabase.auth.signOut({ scope: 'local' }) }
 
   return (
     <Ctx.Provider value={{
