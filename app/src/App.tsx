@@ -14,7 +14,7 @@ function Protegida({ children }: { children: React.ReactNode }) {
   const { usuario, cargando, salir } = useSesion()
   if (cargando) return null
   if (!usuario) return <Navigate to="/login" replace />
-  if (usuario.rol === 'propietario') return <Navigate to="/propietario" replace />
+  if (usuario.rol === 'propietario') return <Navigate to="/login" replace />
   if (!usuario.empresa) {
     return (
       <main className="contenido">

@@ -11,7 +11,7 @@ export function Login() {
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
-  if (usuario) return <Navigate to="/" replace />
+  if (usuario && usuario.rol !== 'propietario') return <Navigate to="/" replace />
 
   const enviar = async (ev: FormEvent) => {
     ev.preventDefault()

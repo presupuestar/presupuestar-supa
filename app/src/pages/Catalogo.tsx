@@ -22,7 +22,7 @@ function mensajeErrorImportacion(e: unknown): string {
 
 function verificarMonedaPersistida(monedaGuardada: string | undefined, monedaEsperada: string) {
   if (normalizarMoneda(monedaGuardada) !== normalizarMoneda(monedaEsperada)) {
-    throw new Error(`El servidor no guardó la moneda ${normalizarMoneda(monedaEsperada)}. Aplicá las migraciones de PocketBase y volvé a importar; el ítem no se considera sincronizado.`)
+    throw new Error(`Supabase no guardó la moneda ${normalizarMoneda(monedaEsperada)}. Revisá que las migraciones de Supabase estén aplicadas; el ítem no se considera sincronizado.`)
   }
 }
 

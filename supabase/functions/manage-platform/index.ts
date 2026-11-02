@@ -47,6 +47,125 @@ Deno.serve(async (request: Request) => {
   } catch {
     return json({ error: 'El cuerpo de la solicitud no es JSON válido.' }, 400)
   }
+  if (payload.action === 'update-company') {
+    const companyId = typeof payload.companyId === 'string' ? payload.companyId : ''
+    const changes = payload.changes && typeof payload.changes === 'object'
+      ? payload.changes as Record<string, unknown>
+      : {}
+    if (!companyId || !Object.keys(changes).length) return json({ error: 'Faltan datos de la empresa.' }, 400)
+    const allowed = [
+      'name', 'document', 'email', 'phone', 'logo_path', 'title_font_path', 'text_font_path',
+      'primary_color', 'accent_color', 'title_font', 'text_font', 'validity_days', 'terms', 'show_seal',
+    ]
+    const safeChanges = Object.fromEntries(Object.entries(changes).filter(([key]) => allowed.includes(key)))
+    if (!Object.keys(safeChanges).length) return json({ error: 'No hay campos válidos para actualizar.' }, 400)
+    const { data: updated, error } = await adminClient.from('companies').update(safeChanges)
+      .eq('id', companyId).select('id').maybeSingle()
+    if (error) return json({ error: error.message }, 400)
+    if (!updated) return json({ error: 'No se encontró la empresa.' }, 404)
+    return json({ ok: true })
+  }
+
+  if (payload.action === 'create-company-user') {
+    const companyId = typeof payload.companyId === 'string' ? payload.companyId : ''
+    const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : ''
+    const password = typeof payload.password === 'string' ? payload.password : ''
+    const name = typeof payload.name === 'string' ? payload.name.trim() : ''
+    const role = payload.role === 'admin' ? 'admin' : payload.role === 'member' ? 'member' : ''
+    if (!companyId || !name || !role || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 72) {
+      return json({ error: 'Revisá los datos del usuario.' }, 400)
+    }
+    const { data: company, error: companyError } = await adminClient.from('companies')
+      .select('id').eq('id', companyId).maybeSingle()
+    if (companyError || !company) return json({ error: 'No se encontró la empresa.' }, 404)
+    const { data, error } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      app_metadata: { company_id: companyId, role },
+      user_metadata: { name },
+    })
+    if (error) return json({ error: error.message }, 400)
+    return json({ userId: data.user.id }, 201)
+  }
+
+  if (payload.action === 'update-role' || payload.action === 'reset-password' || payload.action === 'delete-user') {
+    const userId = typeof payload.userId === 'string' ? payload.userId : ''
+    if (!userId) return json({ error: 'Falta el identificador del usuario.' }, 400)
+    const { data: target, error: targetError } = await adminClient.from('profiles')
+      .select('role').eq('user_id', userId).single()
+    if (targetError || target.role === 'owner') return json({ error: 'No se encontró el usuario.' }, 404)
+    const { data: platformOwner, error: ownerLookupError } = await adminClient.from('platform_owners')
+      .select('user_id').eq('user_id', userId).maybeSingle()
+    if (ownerLookupError) return json({ error: ownerLookupError.message }, 400)
+    if (platformOwner) return json({ error: 'No se puede modificar una cuenta propietaria de la plataforma.' }, 403)
+
+    if (payload.action === 'update-role') {
+      if (payload.role !== 'admin' && payload.role !== 'member') return json({ error: 'Rol no válido.' }, 400)
+      const { error } = await adminClient.from('profiles').update({ role: payload.role }).eq('user_id', userId)
+      if (error) return json({ error: error.message }, 400)
+      const { data: authUser, error: authGetError } = await adminClient.auth.admin.getUserById(userId)
+      if (authGetError) return json({ error: authGetError.message }, 400)
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(userId, {
+        app_metadata: { ...authUser.user.app_metadata, role: payload.role },
+      })
+      if (authUpdateError) return json({ error: authUpdateError.message }, 400)
+      return json({ ok: true })
+    }
+
+    if (payload.action === 'reset-password') {
+      const password = typeof payload.password === 'string' ? payload.password : ''
+      if (password.length < 8 || password.length > 72) return json({ error: 'La contraseña debe tener entre 8 y 72 caracteres.' }, 400)
+      const { error } = await adminClient.auth.admin.updateUserById(userId, { password })
+      if (error) return json({ error: error.message }, 400)
+      return json({ ok: true })
+    }
+
+    const { error } = await adminClient.auth.admin.deleteUser(userId)
+    if (error) return json({ error: error.message }, 400)
+    return json({ ok: true })
+  }
+
+  if (payload.action === 'delete-company') {
+    const companyId = typeof payload.companyId === 'string' ? payload.companyId : ''
+    if (!companyId) return json({ error: 'Falta el identificador de la empresa.' }, 400)
+    const { data: company, error: companyError } = await adminClient.from('companies')
+      .select('id').eq('id', companyId).maybeSingle()
+    if (companyError || !company) return json({ error: 'No se encontró la empresa.' }, 404)
+    const { data: members, error: membersError } = await adminClient.from('profiles')
+      .select('user_id').eq('company_id', companyId)
+    if (membersError) return json({ error: membersError.message }, 400)
+    const bucket = adminClient.storage.from('company-assets')
+    const { data: folders, error: foldersError } = await bucket.list(companyId, { limit: 1000 })
+    if (foldersError) return json({ error: `No se pudieron revisar los archivos de la empresa: ${foldersError.message}` }, 400)
+    const paths: string[] = []
+    for (const folder of folders) {
+      if (folder.id) {
+        paths.push(`${companyId}/${folder.name}`)
+        continue
+      }
+      const { data: files, error: filesError } = await bucket.list(`${companyId}/${folder.name}`, { limit: 1000 })
+      if (filesError) return json({ error: `No se pudieron revisar los archivos de la empresa: ${filesError.message}` }, 400)
+      paths.push(...files.map((file) => `${companyId}/${folder.name}/${file.name}`))
+    }
+    if (paths.length) {
+      const { error } = await bucket.remove(paths)
+      if (error) return json({ error: `No se pudieron eliminar los archivos de la empresa: ${error.message}` }, 400)
+    }
+    for (const member of members) {
+      const { data: owner } = await adminClient.from('platform_owners')
+        .select('user_id').eq('user_id', member.user_id).maybeSingle()
+      if (!owner) {
+        const { error } = await adminClient.auth.admin.deleteUser(member.user_id)
+        if (error) return json({ error: `No se pudo eliminar un usuario de la empresa: ${error.message}` }, 400)
+      }
+    }
+
+    const { error: deleteError } = await adminClient.from('companies').delete().eq('id', companyId)
+    if (deleteError) return json({ error: deleteError.message }, 400)
+    return json({ ok: true })
+  }
+
   if (payload.action !== 'create-company') return json({ error: 'Acción desconocida.' }, 400)
 
   const company = payload.company && typeof payload.company === 'object'
