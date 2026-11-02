@@ -1,7 +1,7 @@
 /* Tokens: los colores y fuentes de la empresa los inyecta lib/tema.ts */
 :root{color-scheme:light;--primario:#0B2545;--acento:#5BB5F0;--tinta:#101828;--muted:#5B6678;--linea:#E2E8F0;--niebla:#F7F9FC;--superficie:#fff;--superficie-secundaria:#F7F9FC;--ok:#12643F;--no:#B42318;--pe:#7A5300;
   --fuente-titulos:"Poppins",system-ui,sans-serif;--fuente-texto:"Poppins",system-ui,sans-serif}
-:root[data-theme=dark]{color-scheme:dark;--tinta:#E6EAF0;--muted:#A6B0BF;--linea:#344154;--niebla:#111827;--superficie:#1B2636;--superficie-secundaria:#253247;--ok:#5DD39E;--no:#FF8585;--pe:#F6C969}
+:root[data-theme=dark]{color-scheme:dark;--tinta:#F1F5F9;--muted:#C0CBD8;--linea:#53647A;--niebla:#263446;--superficie:#34445A;--superficie-secundaria:#40536A;--ok:#75E0AE;--no:#FF9A9A;--pe:#FFD779}
 *{box-sizing:border-box}
 body{margin:0;font:400 16px/1.6 var(--fuente-texto);color:var(--tinta);background:var(--niebla)}
 h1,h2,h3{font-family:var(--fuente-titulos);color:var(--primario);letter-spacing:-.02em;line-height:1.15;margin:0}
@@ -516,8 +516,9 @@ a.link{color:var(--primario)}
 .clientes-historial-titulo{margin:28px 0 14px}.clientes-paginacion{align-items:center;margin-top:14px}.cliente-nombre{font-weight:600}
 
 :root[data-theme=dark] body{background:var(--niebla);color:var(--tinta)}
-:root[data-theme=dark] h1,:root[data-theme=dark] h2,:root[data-theme=dark] h3{color:color-mix(in srgb,var(--primario) 55%,#fff)}
+:root[data-theme=dark] h1,:root[data-theme=dark] h2,:root[data-theme=dark] h3{color:#D8E7FA}
 :root[data-theme=dark] .login-lado h1{color:#fff}
+:root[data-theme=dark] .tarjetas strong,:root[data-theme=dark] .resumen dd,:root[data-theme=dark] .total-num strong{color:#D8E7FA}
 :root[data-theme=dark] .barra,:root[data-theme=dark] .tabla-caja,:root[data-theme=dark] .tarjetas article,
 :root[data-theme=dark] .resumen dl div,:root[data-theme=dark] .panel,:root[data-theme=dark] .ventana,
 :root[data-theme=dark] dialog,:root[data-theme=dark] .acciones-catalogo,:root[data-theme=dark] .acciones-catalogo-plegable>.catalogo-desplegable-resumen,
@@ -527,7 +528,9 @@ a.link{color:var(--primario)}
  background:var(--superficie);color:var(--tinta);border-color:var(--linea)
 }
 :root[data-theme=dark] .barra nav a,:root[data-theme=dark] .link,:root[data-theme=dark] a.link,
-:root[data-theme=dark] .catalogo-menu-fila summary{color:color-mix(in srgb,var(--primario) 55%,#fff)}
+:root[data-theme=dark] .catalogo-menu-fila summary{color:#C5DCFA}
+:root[data-theme=dark] .barra nav a.activo,:root[data-theme=dark] .barra nav a:hover{color:#EFF6FF}
+:root[data-theme=dark] .btn:not(.sec){background:#3679BE;color:#fff}
 :root[data-theme=dark] input:not([type=checkbox]):not([type=radio]):not([type=color]),
 :root[data-theme=dark] select,:root[data-theme=dark] textarea,
 :root[data-theme=dark] .login-form input,:root[data-theme=dark] .importacion-campo{
@@ -540,12 +543,12 @@ a.link{color:var(--primario)}
 :root[data-theme=dark] .tabla tbody tr.sel,:root[data-theme=dark] .tabla-catalogo tr.seleccionado{background:color-mix(in srgb,var(--acento) 16%,var(--superficie))}
 :root[data-theme=dark] .tabla-catalogo tbody tr:not(.fila-vacia),
 :root[data-theme=dark] .seccion-desplegable .resumen-tabla tbody tr{background:var(--superficie);border-color:var(--linea)}
-:root[data-theme=dark] .aviso,:root[data-theme=dark] .aviso-cotizacion{background:#18352D;color:#A9E8C9;border-color:#285544}
-:root[data-theme=dark] .importacion-fallida{background:#402929}
+:root[data-theme=dark] .aviso,:root[data-theme=dark] .aviso-cotizacion{background:#315B49;color:#D0F5E1;border-color:#52816B}
+:root[data-theme=dark] .importacion-fallida{background:#674545}
 :root[data-theme=dark] .confirmacion-eliminacion-tarjeta{background:var(--superficie);color:var(--tinta)}
 :root[data-theme=dark] .login-form input:focus,:root[data-theme=dark] .campo input:focus,
 :root[data-theme=dark] .campo select:focus,:root[data-theme=dark] .campo textarea:focus{border-color:var(--acento)}
-:root[data-theme=dark] .btn.sec{border:1px solid var(--linea);background:var(--superficie);color:var(--tinta)}
+:root[data-theme=dark] .btn.sec{border:1px solid var(--linea);background:var(--superficie-secundaria);color:var(--tinta)}
 :root[data-theme=dark] .resultados-agregar-item,:root[data-theme=dark] .resultados-agregar-item button,
 :root[data-theme=dark] .menu-toggle,:root[data-theme=dark] .tabla-historial tbody tr,
 :root[data-theme=dark] .tabla-equipo tbody tr:not(.fila-vacia),:root[data-theme=dark] .tabla-catalogo tbody tr:not(.fila-vacia),
@@ -554,6 +557,14 @@ a.link{color:var(--primario)}
   background:var(--superficie);color:var(--tinta);border-color:var(--linea)
 }
 :root[data-theme=dark] .resultados-agregar-item button:hover{background:var(--superficie-secundaria)}
+:root[data-theme=dark] .tabla-historial tbody tr,:root[data-theme=dark] .tabla-equipo tbody tr:not(.fila-vacia),
+:root[data-theme=dark] .tabla-catalogo tbody tr:not(.fila-vacia){background:#34445A}
+:root[data-theme=dark] .confirmacion-eliminacion-acciones .btn.sec{background:var(--superficie-secundaria);color:var(--tinta)}
+:root[data-theme=dark] .aviso pre,:root[data-theme=dark] .tabla tfoot td{background:var(--superficie-secundaria)}
+:root[data-theme=dark] .estado-sel option{background:var(--superficie);color:var(--tinta)}
+:root[data-theme=dark] .pill.on{background:#315B49;color:#D0F5E1}
+:root[data-theme=dark] .pill.off{background:#4B596B;color:#E5EAF0}
+:root[data-theme=dark] .etiqueta-mayorista{background:#40536A;color:#D8E7FA}
 :root[data-theme=dark] .campo label,:root[data-theme=dark] .permisos-rol legend{color:var(--tinta)}
 :root[data-theme=dark] .grafico-barras{background:var(--superficie);border-color:var(--linea)}
 :root[data-theme=dark] .grafico-fila{background:var(--superficie-secundaria)}
