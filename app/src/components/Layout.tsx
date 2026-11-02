@@ -1,16 +1,15 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { tienePermiso, useSesion } from '../context/Sesion'
+import { useSesion } from '../context/Sesion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { SelloPresupuestar } from './Isotipo'
 import { PrimerAccesoDialog } from './PrimerAccesoDialog'
-import { PreferenciasVisuales, VolverArriba } from './PreferenciasVisuales'
 
 const clase = ({ isActive }: { isActive: boolean }) => (isActive ? 'activo' : '')
 
 /** Barra superior + pie, compartidos por todas las pantallas internas. */
 export function Layout({ children }: { children: ReactNode }) {
-  const { usuario, empresa, salir, errorEmpresa } = useSesion()
+  const { usuario, empresa, salir } = useSesion()
   const [menuAbierto, setMenuAbierto] = useState(false)
   return (
     <div className="app">
@@ -21,19 +20,16 @@ export function Layout({ children }: { children: ReactNode }) {
         </button>
         <nav id="navegacion-principal" className={menuAbierto ? 'menu-abierto' : ''} aria-label="Principal" onClick={() => setMenuAbierto(false)}>
           <NavLink to="/" end className={clase}>Inicio</NavLink>
-          {tienePermiso(usuario, 'catalog.view') && <NavLink to="/catalogo" className={clase}>Catálogo</NavLink>}
-          {tienePermiso(usuario, 'quotes.create') && <NavLink to="/nuevo" className={clase}>Nuevo presupuesto</NavLink>}
-          {(tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && <NavLink to="/historial" className={clase}>Historial</NavLink>}
-          {tienePermiso(usuario, 'clients.manage') && <NavLink to="/clientes" className={clase}>Clientes</NavLink>}
+          <NavLink to="/catalogo" className={clase}>Catálogo</NavLink>
+          <NavLink to="/nuevo" className={clase}>Nuevo presupuesto</NavLink>
+          <NavLink to="/historial" className={clase}>Historial</NavLink>
           {usuario?.rol === 'admin' && <NavLink to="/equipo" className={clase}>Equipo</NavLink>}
         </nav>
-        <span className="usuario"><PreferenciasVisuales /> {usuario?.email} <button className="link" onClick={salir}>Salir</button></span>
+        <span className="usuario">{usuario?.email} <button className="link" onClick={salir}>Salir</button></span>
       </header>
-      {errorEmpresa && <p className="error" role="alert">{errorEmpresa}</p>}
       {children}
       <PrimerAccesoDialog />
       {empresa?.mostrarSello !== false && <footer className="pie"><SelloPresupuestar /></footer>}
-      <VolverArriba />
     </div>
   )
 }

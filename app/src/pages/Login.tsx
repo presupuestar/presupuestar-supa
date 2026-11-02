@@ -3,7 +3,6 @@ import { Navigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useSesion } from '../context/Sesion'
 import { Isotipo } from '../components/Isotipo'
-import { PreferenciasVisuales } from '../components/PreferenciasVisuales'
 
 export function Login() {
   const { usuario, entrar } = useSesion()
@@ -24,7 +23,6 @@ export function Login() {
 
   return (
     <main className="login">
-      <div className="login-theme"><PreferenciasVisuales /></div>
       <section className="login-lado">
         <span className="marca"><Isotipo size={44} tile="#1F6FEB" /><strong>Presupuest<b style={{ color: '#5BB5F0' }}>AR</b></strong></span>
         <h1>Presupuestos profesionales en 1 minuto.</h1>

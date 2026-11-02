@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { ClientResponseError } from 'pocketbase'
 import { Layout } from '../components/Layout'
-import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseImporte } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
-import { validarCodigoMoneda } from '../lib/moneda'
 import type { Item } from '../lib/tipos'
 
 const UNIDADES = ['unidad', 'hora', 'día', 'mes', 'año', 'm²', 'kg']
-const ITEMS_CATALOGO_POR_PAGINA = 30
-const ITEMS_IMPORTACION_POR_PAGINA = 100
+const NUEVO_MAYORISTA = '__nuevo_mayorista__'
+const ITEMS_POR_PAGINA = 100
 const normalizarClave = (texto: string) =>
   texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
 const claveImportacion = (nombre: string, proveedor: string) =>
@@ -18,13 +17,14 @@ const claveFilaPdf = (nombre: string, precio: number, moneda: string) =>
   `${normalizarClave(nombre)}|${precio}|${normalizarMoneda(moneda)}`
 
 function mensajeErrorImportacion(e: unknown): string {
+  if (e instanceof ClientResponseError) return mensajeError(e, 'No se pudo sincronizar el ítem.')
   if (e instanceof Error) return e.message
   return mensajeError(e, 'No se pudo sincronizar el ítem.')
 }
 
 function verificarMonedaPersistida(monedaGuardada: string | undefined, monedaEsperada: string) {
   if (normalizarMoneda(monedaGuardada) !== normalizarMoneda(monedaEsperada)) {
-    throw new Error(`Supabase no guardó la moneda ${normalizarMoneda(monedaEsperada)}. Revisá que las migraciones de Supabase estén aplicadas; el ítem no se considera sincronizado.`)
+    throw new Error(`El servidor no guardó la moneda ${normalizarMoneda(monedaEsperada)}. Aplicá las migraciones de PocketBase y volvé a importar; el ítem no se considera sincronizado.`)
   }
 }
 
@@ -38,24 +38,15 @@ interface CandidatoImportacion {
 }
 
 export function Catalogo() {
-  const { usuario } = useSesion()
-  const puedeAdministrar = tienePermiso(usuario, 'catalog.manage')
   const pdfInput = useRef<HTMLInputElement>(null)
   const revisionFinal = useRef<HTMLDivElement>(null)
   const confirmacionRef = useRef<HTMLDialogElement>(null)
   const [items, setItems] = useState<Item[] | null>(null)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPaginasItems, setTotalPaginasItems] = useState(0)
-  const [cargandoItems, setCargandoItems] = useState(true)
-  const [actualizacionItems, setActualizacionItems] = useState(0)
-  const [soloSinProveedor, setSoloSinProveedor] = useState(false)
-  const secuenciaCargaItems = useRef(0)
-  const itemsSeleccionadosCache = useRef(new Map<string, Item>())
   const importadorPdf = useRef<HTMLDetailsElement>(null)
   const [busqueda, setBusqueda] = useState('')
   const [paginaItems, setPaginaItems] = useState(0)
   const [paginaCandidatos, setPaginaCandidatos] = useState(0)
-  const [proveedor, setProveedor] = useState('')
+  const [proveedor, setProveedor] = useState('todos')
   const [verInactivos, setVerInactivos] = useState(false)
   const [editando, setEditando] = useState<Item | 'nuevo' | null>(null)
   const [error, setError] = useState('')
@@ -65,6 +56,7 @@ export function Catalogo() {
   const [proveedorSeleccion, setProveedorSeleccion] = useState('')
   const [archivoPdf, setArchivoPdf] = useState<File | null>(null)
   const [proveedorPdf, setProveedorPdf] = useState('')
+  const [nuevoProveedorPdf, setNuevoProveedorPdf] = useState('')
   const [candidatos, setCandidatos] = useState<CandidatoImportacion[]>([])
   const [leyendoPdf, setLeyendoPdf] = useState(false)
   const [guardandoPdf, setGuardandoPdf] = useState(false)
@@ -72,48 +64,13 @@ export function Catalogo() {
   const [progresoGuardado, setProgresoGuardado] = useState('')
   const [mensajeImportacion, setMensajeImportacion] = useState('')
 
-  const cargar = () => setActualizacionItems((actual) => actual + 1)
+  const cargar = () =>
+    repositorio.items.listar(false).then((l) => { setItems(l); setError('') }).catch((e) => { setItems([]); setError(mensajeError(e, 'No se pudo cargar el catálogo.')) })
+  useEffect(() => { cargar() }, [])
+  useEffect(() => { setPaginaItems(0) }, [busqueda, proveedor, verInactivos])
   useEffect(() => {
-    let vigente = true
-    const secuencia = ++secuenciaCargaItems.current
-    setCargandoItems(true)
-    const temporizador = window.setTimeout(() => {
-      repositorio.items.listarPagina({
-        pagina: paginaItems + 1,
-        porPagina: ITEMS_CATALOGO_POR_PAGINA,
-        soloActivos: !verInactivos,
-        busqueda,
-        proveedor,
-        sinProveedor: soloSinProveedor,
-      }).then((resultado) => {
-        if (!vigente || secuencia !== secuenciaCargaItems.current) return
-        for (const item of resultado.items) {
-          if (itemsSeleccionadosCache.current.has(item.id)) itemsSeleccionadosCache.current.set(item.id, item)
-        }
-        setItems(resultado.items)
-        setTotalItems(resultado.totalItems)
-        setTotalPaginasItems(resultado.totalPages)
-        setError('')
-        setPaginaItems((pagina) => Math.min(pagina, Math.max(0, resultado.totalPages - 1)))
-      }).catch((e) => {
-        if (!vigente || secuencia !== secuenciaCargaItems.current) return
-        setItems([])
-        setTotalItems(0)
-        setTotalPaginasItems(0)
-        setError(mensajeError(e, 'No se pudo cargar el catálogo.'))
-      }).finally(() => {
-        if (vigente && secuencia === secuenciaCargaItems.current) setCargandoItems(false)
-      })
-    }, 250)
-    return () => {
-      vigente = false
-      window.clearTimeout(temporizador)
-    }
-  }, [paginaItems, busqueda, proveedor, soloSinProveedor, verInactivos, actualizacionItems])
-  useEffect(() => {
-    setPaginaCandidatos((pagina) => Math.min(pagina, Math.max(0, Math.ceil(candidatos.length / ITEMS_IMPORTACION_POR_PAGINA) - 1)))
+    setPaginaCandidatos((pagina) => Math.min(pagina, Math.max(0, Math.ceil(candidatos.length / ITEMS_POR_PAGINA) - 1)))
   }, [candidatos.length])
-  useEffect(() => { setPaginaItems(0) }, [busqueda, proveedor, soloSinProveedor, verInactivos])
   useEffect(() => {
     const dialogo = confirmacionRef.current
     if (confirmarEliminacion && dialogo && !dialogo.open) dialogo.showModal()
@@ -121,18 +78,29 @@ export function Catalogo() {
   }, [confirmarEliminacion])
 
   const proveedores = useMemo(() => [...new Set((items ?? []).map((i) => i.proveedor?.trim()).filter((p): p is string => Boolean(p)))].sort((a, b) => a.localeCompare(b)), [items])
-  const mayoristaImportacion = proveedorPdf.trim()
-  const visibles = items ?? []
+  const mayoristaImportacion = proveedorPdf === NUEVO_MAYORISTA ? nuevoProveedorPdf.trim() : proveedorPdf.trim()
+  const visibles = useMemo(() => {
+    const q = busqueda.trim().toLowerCase()
+    return (items ?? []).filter((i) =>
+      (verInactivos || i.activo) &&
+      (proveedor === 'todos' || (i.proveedor?.trim() || 'sin-proveedor') === proveedor) &&
+      (!q || `${i.nombre} ${i.descripcion ?? ''} ${i.proveedor ?? ''}`.toLowerCase().includes(q)))
+  }, [items, busqueda, proveedor, verInactivos])
   const secciones = useMemo(() => {
     const grupos = new Map<string, Item[]>()
-    for (const item of visibles) {
+    const inicio = paginaItems * ITEMS_POR_PAGINA
+    for (const item of visibles.slice(inicio, inicio + ITEMS_POR_PAGINA)) {
       const clave = item.proveedor?.trim() || 'Sin proveedor'
       const grupo = grupos.get(clave)
       if (grupo) grupo.push(item)
       else grupos.set(clave, [item])
     }
     return [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [visibles])
+  }, [visibles, paginaItems])
+  const paginasItems = Math.max(1, Math.ceil(visibles.length / ITEMS_POR_PAGINA))
+  useEffect(() => {
+    setPaginaItems((pagina) => Math.min(pagina, paginasItems - 1))
+  }, [paginasItems])
   const todosVisiblesSeleccionados = visibles.length > 0 && visibles.every((i) => seleccionados.has(i.id))
   const cantidadSeleccionada = seleccionados.size
 
@@ -151,46 +119,26 @@ export function Catalogo() {
     setSeleccionados((actuales) => {
       const nuevos = new Set(actuales)
       for (const item of visibles) {
-        if (seleccionar) {
-          nuevos.add(item.id)
-          itemsSeleccionadosCache.current.set(item.id, item)
-        } else {
-          nuevos.delete(item.id)
-          itemsSeleccionadosCache.current.delete(item.id)
-        }
+        if (seleccionar) nuevos.add(item.id)
+        else nuevos.delete(item.id)
       }
       return nuevos
     })
   }
 
-  const cambiarSeleccion = (item: Item, marcar: boolean) => {
+  const cambiarSeleccion = (id: string, marcar: boolean) => {
     setConfirmarEliminacion(false)
     setSeleccionados((actuales) => {
       const nuevos = new Set(actuales)
-      if (marcar) {
-        nuevos.add(item.id)
-        itemsSeleccionadosCache.current.set(item.id, item)
-      } else {
-        nuevos.delete(item.id)
-        itemsSeleccionadosCache.current.delete(item.id)
-      }
+      if (marcar) nuevos.add(id)
+      else nuevos.delete(id)
       return nuevos
     })
   }
 
-  const quitarSeleccion = () => {
-    itemsSeleccionadosCache.current.clear()
-    setSeleccionados(new Set())
-  }
-
   const ejecutarSeleccion = async (accion: 'activar' | 'desactivar' | 'eliminar' | 'proveedor') => {
-    const objetivos = [...seleccionados]
-      .map((id) => itemsSeleccionadosCache.current.get(id))
-      .filter((item): item is Item => Boolean(item))
+    const objetivos = (items ?? []).filter((item) => seleccionados.has(item.id))
     if (objetivos.length === 0 || procesandoLote) return
-    if (objetivos.length !== seleccionados.size) {
-      return setError('No se pudieron recuperar todos los ítems seleccionados. Quitá la selección y volvé a seleccionarlos.')
-    }
     if (accion === 'proveedor' && !proveedorSeleccion.trim()) return setError('Escribí el nombre del proveedor para asignarlo a los ítems seleccionados.')
     if (accion === 'eliminar' && !confirmarEliminacion) {
       setConfirmarEliminacion(true)
@@ -220,18 +168,11 @@ export function Catalogo() {
 
       setSeleccionados((actuales) => {
         const nuevos = new Set(actuales)
-        for (const id of completados) {
-          nuevos.delete(id)
-          itemsSeleccionadosCache.current.delete(id)
-        }
+        for (const id of completados) nuevos.delete(id)
         return nuevos
       })
       await cargar()
-      if (accion === 'proveedor' && fallidos.length === 0) {
-        setSoloSinProveedor(false)
-        setProveedor(proveedorSeleccion.trim())
-        setPaginaItems(0)
-      }
+      if (accion === 'proveedor' && fallidos.length === 0) setProveedor(proveedorSeleccion.trim())
       if (fallidos.length > 0) {
         const detalle = fallidos.slice(0, 3).map(({ item, error: detalleError }) => `${item.nombre}: ${detalleError}`).join(' ')
         const estadoLote = fallidos.length === 1 ? '1 ítem no se pudo procesar' : `${fallidos.length} ítems no se pudieron procesar`
@@ -292,8 +233,6 @@ export function Catalogo() {
     if (!mayoristaImportacion) return setError('Seleccioná un mayorista existente o escribí el nombre de uno nuevo antes de cargar los materiales.')
     const seleccionados = candidatos.filter((c) => c.seleccionado)
     if (seleccionados.length === 0) return setError('Seleccioná al menos un material para cargar.')
-    const monedaInvalida = seleccionados.find((c) => !validarCodigoMoneda(c.moneda))
-    if (monedaInvalida) return setError(`Ingresá un código ISO 4217 válido para «${monedaInvalida.nombre}».`)
     const invalidos = seleccionados.find((c) => !c.nombre.trim() || !Number.isFinite(parseImporte(c.precio)) || parseImporte(c.precio) < 0)
     if (invalidos) return setError('Revisá los materiales seleccionados: cada uno necesita nombre e importe igual o mayor a 0.')
 
@@ -307,10 +246,7 @@ export function Catalogo() {
     let actualizados = 0
     const fallidos: { candidato: CandidatoImportacion; error: string }[] = []
     try {
-      const existentes = await repositorio.items.buscarPorNombresYProveedor(
-        seleccionados.map((candidato) => candidato.nombre),
-        mayoristaImportacion,
-      )
+      const existentes = await repositorio.items.listar(false)
       const existentesPorClave = new Map<string, Item[]>()
       for (const item of existentes) {
         const clave = claveImportacion(item.nombre, item.proveedor ?? '')
@@ -404,6 +340,7 @@ export function Catalogo() {
       if (fallidos.length === 0) {
         setArchivoPdf(null)
         setProveedorPdf('')
+        setNuevoProveedorPdf('')
       }
     } catch (e) {
       setError(mensajeError(e, 'No se pudo consultar el catálogo para sincronizar los ítems del PDF. No se modificó ningún ítem.'))
@@ -429,12 +366,8 @@ export function Catalogo() {
             <h1>Catálogo</h1>
             <p className="sub">Los ítems que cargás una vez y después elegís al armar cada presupuesto.</p>
           </div>
-          {puedeAdministrar && <div className="encabezado-acciones">
-            <button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Nuevo ítem</button>
-          </div>}
         </div>
 
-        {puedeAdministrar && <>
         <details className="panel importador-pdf catalogo-desplegable" id="pdf-catalogo" ref={importadorPdf}>
           <summary className="catalogo-desplegable-resumen" onClick={(e) => {
             if (leyendoPdf || guardandoPdf) e.preventDefault()
@@ -454,6 +387,7 @@ export function Catalogo() {
           <div className="importador-contenido">
           <div className="botones importador-acciones">
             <button type="button" className="btn sec chico" onClick={() => pdfInput.current?.click()}>Importar PDF</button>
+            <button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Nuevo ítem</button>
           </div>
           <p className="ayuda">Leemos catálogos con texto seleccionable y detectamos filas que terminan en un precio. La moneda explícita del PDF (incluida la que aparece junto al precio) prevalece; al reimportar, también corregimos la moneda de registros existentes con el mismo nombre, mayorista e importe.</p>
           <div className="dos">
@@ -461,9 +395,17 @@ export function Catalogo() {
               <input ref={pdfInput} type="file" accept="application/pdf,.pdf" onChange={(e) => { setArchivoPdf(e.target.files?.[0] ?? null); setCandidatos([]); setError(''); setMensajeImportacion('') }} />
             </label>
             <label className="campo">Mayorista del catálogo <small>(obligatorio · uso interno)</small>
-              <input required list="mayoristas-importacion" value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)} maxLength={160} placeholder="Elegí o escribí un mayorista…" />
-              <datalist id="mayoristas-importacion">{proveedores.map((p) => <option key={p} value={p} />)}</datalist>
+              <select required value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)}>
+                <option value="">Elegí un mayorista…</option>
+                {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
+                <option value={NUEVO_MAYORISTA}>+ Crear nuevo mayorista</option>
+              </select>
             </label>
+            {proveedorPdf === NUEVO_MAYORISTA && (
+              <label className="campo">Nombre del nuevo mayorista
+                <input required value={nuevoProveedorPdf} onChange={(e) => setNuevoProveedorPdf(e.target.value)} maxLength={160} placeholder="Ej.: Corralón San Martín" />
+              </label>
+            )}
           </div>
           <div className="botones importador-acciones">
             <button type="button" className="btn sec chico" disabled={!archivoPdf || leyendoPdf || guardandoPdf} onClick={procesarPdf}>
@@ -490,7 +432,7 @@ export function Catalogo() {
                 <table className="tabla tabla-importacion">
                   <thead><tr><th>Incluir</th><th>Ítem</th><th className="num">Precio unitario</th><th>Moneda</th></tr></thead>
                   <tbody>
-                    {candidatos.slice(paginaCandidatos * ITEMS_IMPORTACION_POR_PAGINA, (paginaCandidatos + 1) * ITEMS_IMPORTACION_POR_PAGINA).map((c) => (
+                    {candidatos.slice(paginaCandidatos * ITEMS_POR_PAGINA, (paginaCandidatos + 1) * ITEMS_POR_PAGINA).map((c) => (
                       <tr key={c.key} className={`${c.seleccionado ? '' : 'apagado'}${c.error ? ' importacion-fallida' : ''}`}>
                         <td><input type="checkbox" checked={c.seleccionado} aria-label={`Incluir ${c.nombre}`} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, seleccionado: e.target.checked } : x))} /></td>
                         <td>
@@ -498,17 +440,16 @@ export function Catalogo() {
                           {c.error && <small className="importacion-error" role="alert"><strong>No se pudo cargar:</strong> {c.error}</small>}
                         </td>
                         <td><input className="importacion-campo precio" aria-label={`Precio de ${c.nombre}`} inputMode="decimal" value={c.precio} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, precio: e.target.value } : x))} /></td>
-                        <td><input className="importacion-campo moneda" value={c.moneda} maxLength={3} aria-label={`Moneda ISO 4217 de ${c.nombre}`}
-                          onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, moneda: e.target.value.toUpperCase() } : x))} /></td>
+                        <td><span className="pill pers">{c.moneda}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {candidatos.length > ITEMS_IMPORTACION_POR_PAGINA && <div className="paginacion-catalogo">
+              {candidatos.length > ITEMS_POR_PAGINA && <div className="paginacion-catalogo">
                 <button type="button" className="btn sec chico" disabled={paginaCandidatos === 0} onClick={() => setPaginaCandidatos((pagina) => Math.max(0, pagina - 1))}>Anterior</button>
-                <span>Ítems {paginaCandidatos * ITEMS_IMPORTACION_POR_PAGINA + 1}–{Math.min((paginaCandidatos + 1) * ITEMS_IMPORTACION_POR_PAGINA, candidatos.length)} de {candidatos.length}</span>
-                <button type="button" className="btn sec chico" disabled={paginaCandidatos >= Math.ceil(candidatos.length / ITEMS_IMPORTACION_POR_PAGINA) - 1} onClick={() => setPaginaCandidatos((pagina) => pagina + 1)}>Siguiente</button>
+                <span>Ítems {paginaCandidatos * ITEMS_POR_PAGINA + 1}–{Math.min((paginaCandidatos + 1) * ITEMS_POR_PAGINA, candidatos.length)} de {candidatos.length}</span>
+                <button type="button" className="btn sec chico" disabled={paginaCandidatos >= Math.ceil(candidatos.length / ITEMS_POR_PAGINA) - 1} onClick={() => setPaginaCandidatos((pagina) => pagina + 1)}>Siguiente</button>
               </div>}
               <div className="importacion-pie" ref={revisionFinal}>
                 {mensajeImportacion && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
@@ -533,22 +474,23 @@ export function Catalogo() {
           {mensajeImportacion && candidatos.length === 0 && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
           </div>
         </details>
-        </>}
 
         <div className="filtros">
           <input type="search" placeholder="Buscar ítem…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar ítem" />
-          <input type="search" placeholder="Filtrar por proveedor…" value={proveedor} disabled={soloSinProveedor} onChange={(e) => setProveedor(e.target.value)} aria-label="Filtrar por proveedor" />
-          <label className="check"><input type="checkbox" checked={soloSinProveedor} onChange={(e) => { setSoloSinProveedor(e.target.checked); if (e.target.checked) setProveedor('') }} /> Sin proveedor</label>
+          <select value={proveedor} onChange={(e) => setProveedor(e.target.value)} aria-label="Filtrar por proveedor" className="filtro-estado">
+            <option value="todos">Todos los proveedores</option>
+            <option value="sin-proveedor">Sin proveedor</option>
+            {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
           <label className="check"><input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} /> Mostrar desactivados</label>
         </div>
-        {error && <p className="error" role="alert">{error}</p>}
-        {totalItems > 0 && <div className="paginacion-catalogo catalogo-paginacion">
-          <span>{paginaItems * ITEMS_CATALOGO_POR_PAGINA + 1}–{Math.min((paginaItems + 1) * ITEMS_CATALOGO_POR_PAGINA, totalItems)} de {totalItems} ítems</span>
-          <button type="button" className="btn sec chico" disabled={cargandoItems || paginaItems === 0} onClick={() => setPaginaItems((pagina) => Math.max(0, pagina - 1))}>Anterior</button>
-          <button type="button" className="btn sec chico" disabled={cargandoItems || paginaItems >= totalPaginasItems - 1} onClick={() => setPaginaItems((pagina) => Math.min(totalPaginasItems - 1, pagina + 1))}>Siguiente</button>
+        {visibles.length > ITEMS_POR_PAGINA && <div className="paginacion-catalogo catalogo-paginacion">
+          <span>{paginaItems * ITEMS_POR_PAGINA + 1}–{Math.min((paginaItems + 1) * ITEMS_POR_PAGINA, visibles.length)} de {visibles.length} ítems</span>
+          <button type="button" className="btn sec chico" disabled={paginaItems === 0} onClick={() => setPaginaItems((pagina) => Math.max(0, pagina - 1))}>Anterior</button>
+          <button type="button" className="btn sec chico" disabled={paginaItems >= paginasItems - 1} onClick={() => setPaginaItems((pagina) => Math.min(paginasItems - 1, pagina + 1))}>Siguiente</button>
         </div>}
 
-        {puedeAdministrar && <details className="acciones-catalogo-plegable catalogo-desplegable">
+        <details className="acciones-catalogo-plegable catalogo-desplegable">
           <summary className="catalogo-desplegable-resumen">
             <span>
               <strong>Acciones de selección</strong>
@@ -558,9 +500,9 @@ export function Catalogo() {
           </summary>
           <div className="acciones-catalogo" aria-label="Acciones de selección">
           <div className="catalogo-seleccion">
-            <span className="seleccion-conteo">{cantidadSeleccionada} seleccionado{cantidadSeleccionada === 1 ? '' : 's'} · {totalItems} resultado{totalItems === 1 ? '' : 's'}</span>
-            <button type="button" className="btn sec chico" disabled={cargandoItems || visibles.length === 0 || todosVisiblesSeleccionados || procesandoLote || confirmarEliminacion} onClick={() => seleccionarVisibles(true)}>Seleccionar esta página</button>
-            <button type="button" className="link" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={quitarSeleccion}>Quitar selección</button>
+            <span className="seleccion-conteo">{cantidadSeleccionada} seleccionado{cantidadSeleccionada === 1 ? '' : 's'} · {visibles.length} resultado{visibles.length === 1 ? '' : 's'}</span>
+            <button type="button" className="btn sec chico" disabled={visibles.length === 0 || todosVisiblesSeleccionados || procesandoLote || confirmarEliminacion} onClick={() => seleccionarVisibles(true)}>Seleccionar resultados</button>
+            <button type="button" className="link" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => setSeleccionados(new Set())}>Quitar selección</button>
           </div>
           <div className="catalogo-acciones-lote">
             <span>Acciones para seleccionados</span>
@@ -576,7 +518,7 @@ export function Catalogo() {
             </button>
           </div>
         </div>
-        </details>}
+        </details>
 
         <dialog
           ref={confirmacionRef}
@@ -600,9 +542,8 @@ export function Catalogo() {
           </div>
         </dialog>
 
-        {cargandoItems && <p className="sub" role="status">Cargando página de hasta {ITEMS_CATALOGO_POR_PAGINA} ítems…</p>}
-        {!cargandoItems && secciones.length === 0 ? (
-          <div className="tabla-caja"><p className="vacio">{totalItems === 0 && !busqueda && !proveedor && !soloSinProveedor && !verInactivos ? 'Todavía no cargaste ítems. Empezá con el primero.' : 'No hay ítems que coincidan.'}</p></div>
+        {secciones.length === 0 ? (
+          <div className="tabla-caja"><p className="vacio">{items === null ? 'Cargando…' : items.length === 0 ? 'Todavía no cargaste ítems. Empezá con el primero.' : 'No hay ítems que coincidan.'}</p></div>
         ) : secciones.map(([nombreProveedor, productos]) => (
         <details className="seccion-proveedor catalogo-desplegable" key={nombreProveedor}>
           <summary className="catalogo-desplegable-resumen">
@@ -617,7 +558,7 @@ export function Catalogo() {
               {productos.map((i) => (
                 <tr key={i.id} className={`${i.activo ? '' : 'apagado'}${seleccionados.has(i.id) ? ' seleccionado' : ''}`}>
                   <td className="catalogo-nombre">
-                    {puedeAdministrar && <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>}
+                    <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i.id, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>
                     <span className="catalogo-identidad"><strong>{i.nombre}</strong>{i.descripcion && <small>{i.descripcion}</small>}</span>
                   </td>
                   <td className="catalogo-proveedor" data-label="Proveedor / mayorista">{i.proveedor?.trim() || <span className="sin-dato">Sin asignar</span>}</td>
@@ -625,7 +566,6 @@ export function Catalogo() {
                   <td className="catalogo-precio num" data-label="Precio">{importeEnMoneda(i.precio, i.moneda)}</td>
                   <td className="catalogo-estado" data-label="Estado"><span className={`pill ${i.activo ? 'on' : 'off'}`}>{i.activo ? 'Activo' : 'Desactivado'}</span></td>
                   <td className="catalogo-acciones-fila">
-                    {puedeAdministrar && <>
                     <button className="link" onClick={() => setEditando(i)}>Editar</button>
                     <details className="catalogo-menu-fila">
                       <summary>Más</summary>
@@ -634,7 +574,6 @@ export function Catalogo() {
                         <button className="link peligro" onClick={() => eliminar(i)}>Eliminar</button>
                       </div>
                     </details>
-                    </>}
                   </td>
                 </tr>
               ))}
@@ -643,14 +582,9 @@ export function Catalogo() {
           </div>
         </details>
         ))}
-        {totalItems > 0 && <div className="paginacion-catalogo catalogo-paginacion">
-          <span>{paginaItems * ITEMS_CATALOGO_POR_PAGINA + 1}–{Math.min((paginaItems + 1) * ITEMS_CATALOGO_POR_PAGINA, totalItems)} de {totalItems} ítems</span>
-          <button type="button" className="btn sec chico" disabled={cargandoItems || paginaItems === 0} onClick={() => setPaginaItems((pagina) => Math.max(0, pagina - 1))}>Anterior</button>
-          <button type="button" className="btn sec chico" disabled={cargandoItems || paginaItems >= totalPaginasItems - 1} onClick={() => setPaginaItems((pagina) => Math.min(totalPaginasItems - 1, pagina + 1))}>Siguiente</button>
-        </div>}
       </main>
 
-      {puedeAdministrar && editando && (
+      {editando && (
         <FormItem
           item={editando === 'nuevo' ? null : editando}
           alCerrar={() => setEditando(null)}
@@ -679,11 +613,9 @@ function FormItem({ item, alCerrar, alGuardar }: { item: Item | null; alCerrar: 
     const valor = parseImporte(precio)
     if (!nombre.trim()) return setError('Poné un nombre para el ítem.')
     if (!Number.isFinite(valor) || valor < 0) return setError('El precio tiene que ser un número igual o mayor a 0.')
-    const monedaValida = validarCodigoMoneda(moneda)
-    if (!monedaValida) return setError('Ingresá un código de moneda ISO 4217 válido de tres letras, como ARS, USD o EUR.')
     setError(''); setGuardando(true)
     try {
-      const datos = { nombre: nombre.trim(), descripcion: descripcion.trim(), proveedor: proveedor.trim(), unidad: unidad.trim(), precio: valor, moneda: monedaValida }
+      const datos = { nombre: nombre.trim(), descripcion: descripcion.trim(), proveedor: proveedor.trim(), unidad: unidad.trim(), precio: valor, moneda }
       if (item) await repositorio.items.actualizar(item.id, datos)
       else await repositorio.items.crear({ ...datos, activo: true })
       alGuardar()
@@ -709,9 +641,9 @@ function FormItem({ item, alCerrar, alGuardar }: { item: Item | null; alCerrar: 
               onBlur={() => { const n = parseImporte(precio); if (Number.isFinite(n)) setPrecio(formatearImporte(n)) }} />
           </label>
           <label className="campo">Moneda
-            <input value={moneda} onChange={(e) => setMoneda(e.target.value.toUpperCase())} maxLength={3} minLength={3} list="monedas-iso" placeholder="ARS" />
-            <datalist id="monedas-iso">{['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'UYU', 'PYG', 'BOB', 'COP', 'MXN', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'CNY', 'PEN', 'UYU', 'ZAR', 'INR', 'KRW', 'NZD', 'SEK', 'NOK', 'DKK', 'PLN', 'TRY'].map((codigo) => <option key={codigo} value={codigo} />)}</datalist>
-            <small>Usá un código ISO 4217 de tres letras.</small>
+            <select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+              {['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'UYU', 'PYG', 'BOB', 'COP', 'MXN', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'CNY'].map((codigo) => <option key={codigo} value={codigo}>{codigo}</option>)}
+            </select>
           </label>
           <label className="campo">Unidad
             <input value={unidad} onChange={(e) => setUnidad(e.target.value)} list="unidades" maxLength={30} />

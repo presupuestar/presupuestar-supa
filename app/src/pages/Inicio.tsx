@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { tienePermiso, useSesion } from '../context/Sesion'
 import { Layout } from '../components/Layout'
+import { GraficoCircular } from '../components/GraficoCircular'
 import { importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
 import { repositorio } from '../lib/repositorio'
@@ -55,16 +56,21 @@ export function Inicio() {
         {mes && (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && (
           <section className="resumen">
             <div className="encabezado"><h2>Resumen de {nombreMes(mes.mes)}</h2><Link className="link" to="/historial">Ver historial completo</Link></div>
-            {resumenMes.map((m) => (
-              <dl key={m.moneda}>
-                <div><dt>Moneda</dt><dd>{normalizarMoneda(m.moneda)}</dd></div>
-                <div><dt>Presupuestado</dt><dd>{importeEnMoneda(m.presupuestado, m.moneda)}</dd></div>
-                <div><dt>Aceptado</dt><dd className="ok">{importeEnMoneda(m.aceptado, m.moneda)}</dd></div>
-                <div><dt>Ganancia mensual</dt><dd className="ok">{importeEnMoneda(m.ganancia, m.moneda)}</dd></div>
-                <div><dt>Rechazado</dt><dd className="no">{importeEnMoneda(m.rechazado, m.moneda)}</dd></div>
-                <div><dt>Pendiente</dt><dd className="pe">{importeEnMoneda(m.pendiente, m.moneda)}</dd></div>
-              </dl>
-            ))}
+            <div className="resumen-mes">
+              {resumenMes.map((m) => (
+                <GraficoCircular
+                  key={m.moneda}
+                  titulo={`Estado de presupuestos · ${normalizarMoneda(m.moneda)}`}
+                  total={importeEnMoneda(m.presupuestado, m.moneda)}
+                  detalle={{ etiqueta: 'Ganancia de aceptados', importe: importeEnMoneda(m.ganancia, m.moneda) }}
+                  segmentos={[
+                    { etiqueta: 'Aceptado', valor: m.aceptado, importe: importeEnMoneda(m.aceptado, m.moneda), color: 'aceptado' },
+                    { etiqueta: 'Pendiente', valor: m.pendiente, importe: importeEnMoneda(m.pendiente, m.moneda), color: 'pendiente' },
+                    { etiqueta: 'Rechazado', valor: m.rechazado, importe: importeEnMoneda(m.rechazado, m.moneda), color: 'rechazado' },
+                  ]}
+                />
+              ))}
+            </div>
           </section>
         )}
       </main>

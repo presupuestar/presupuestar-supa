@@ -10,6 +10,13 @@ import { PERMISOS_EMPRESA, type PermisoEmpresa, type RolEmpresa, type UsuarioEqu
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function mensajeErrorRoles(error: unknown): string {
+  if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST205') {
+    return 'No está instalada la tabla de roles personalizados en Supabase. Desde la raíz del proyecto ejecutá `npx supabase db push --project-ref eqsxzfhpsfaxazzqvnyo` para aplicar la migración pendiente. No vuelvas a ejecutar las migraciones iniciales.'
+  }
+  return mensajeError(error, 'No se pudieron cargar los roles.')
+}
+
 /** El administrador de la empresa crea y gestiona a sus empleados. */
 export function Equipo() {
   const { usuario, empresa } = useSesion()
@@ -31,7 +38,7 @@ export function Equipo() {
   const [copiado, setCopiado] = useState(false)
 
   const cargar = () => repositorio.usuarios.listar().then(setLista).catch((e) => { setLista([]); setError(mensajeError(e, 'No se pudo cargar el equipo.')) })
-  const cargarRoles = () => repositorio.roles.listar().then(setRoles).catch((e) => setError(mensajeError(e, 'No se pudieron cargar los roles.')))
+  const cargarRoles = () => repositorio.roles.listar().then(setRoles).catch((e) => setError(mensajeErrorRoles(e)))
   useEffect(() => { cargar() }, [])
   useEffect(() => { cargarRoles() }, [])
 

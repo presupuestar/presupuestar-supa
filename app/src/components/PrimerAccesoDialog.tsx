@@ -3,12 +3,10 @@ import { useSesion } from '../context/Sesion'
 import { mensajeError } from '../lib/errores'
 
 export function PrimerAccesoDialog() {
-  const { usuario, necesitaClaveActual, resolverPrimerAcceso } = useSesion()
+  const { usuario, resolverPrimerAcceso } = useSesion()
   const ref = useRef<HTMLDialogElement>(null)
-  const [claveActual, setClaveActual] = useState('')
   const [clave, setClave] = useState('')
   const [confirmacion, setConfirmacion] = useState('')
-  const [verClaveActual, setVerClaveActual] = useState(false)
   const [verClave, setVerClave] = useState(false)
   const [verConfirmacion, setVerConfirmacion] = useState(false)
   const [error, setError] = useState('')
@@ -48,12 +46,6 @@ export function PrimerAccesoDialog() {
         <button className="primer-acceso-cerrar" type="button" aria-label="Cerrar" title="Cerrar" disabled={guardando} onClick={() => void responder()}>×</button>
         <h2>¿Querés cambiar tu contraseña?</h2>
         <p className="sub">Podés actualizarla ahora o continuar con la actual.</p>
-        {necesitaClaveActual && <label className="campo">Contraseña actual
-          <span className="campo-password-primer">
-            <input type={verClaveActual ? 'text' : 'password'} value={claveActual} onChange={(e) => setClaveActual(e.target.value)} autoComplete="current-password" disabled={guardando} />
-            <button className="ojo-password" type="button" aria-label={verClaveActual ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'} title={verClaveActual ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'} onClick={() => setVerClaveActual(!verClaveActual)}><span aria-hidden="true" /></button>
-          </span>
-        </label>}
         <label className="campo">Nueva contraseña
           <span className="campo-password-primer">
             <input type={verClave ? 'text' : 'password'} value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="new-password" minLength={8} maxLength={72} disabled={guardando} />

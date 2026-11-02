@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
-import { tienePermiso, useSesion } from '../context/Sesion'
+import { useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseCantidad, parseImporte } from '../lib/formato'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
@@ -28,7 +28,7 @@ const leer = (clave: string) => { try { return localStorage.getItem(clave) ?? ''
 const guardarLocal = (clave: string, valor: string) => { try { localStorage.setItem(clave, valor) } catch { /* sin almacenamiento */ } }
 const nuevaKey = () => globalThis.crypto?.randomUUID?.() ?? `linea-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 
-/** Sirve para crear (/nuevo) y editar borradores, pendientes o aceptados. */
+/** Sirve para crear (/nuevo) y para editar un presupuesto sin respuesta (/presupuestos/:id/editar). */
 export function NuevoPresupuesto() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -48,7 +48,7 @@ export function NuevoPresupuesto() {
     return (
       <Layout><main className="contenido">
         <h1>Este presupuesto ya no se puede editar</h1>
-        <p className="sub">Un presupuesto rechazado queda como registro. Si necesitás corregirlo, volvelo a pendiente desde el historial.</p>
+        <p className="sub">Un presupuesto aceptado o rechazado queda como registro. Si necesitás corregirlo, volvelo a pendiente desde el historial.</p>
         <Link className="btn sec chico" to="/historial">Volver al historial</Link>
       </main></Layout>
     )
@@ -57,7 +57,7 @@ export function NuevoPresupuesto() {
 }
 
 function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo: () => void }) {
-  const { empresa, usuario } = useSesion()
+  const { empresa } = useSesion()
   const [catalogo, setCatalogo] = useState<Item[]>([])
   const [busquedaItem, setBusquedaItem] = useState('')
   const [itemUsdPendiente, setItemUsdPendiente] = useState<Item | null>(null)
@@ -79,7 +79,6 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   const [cotizacionDolar, setCotizacionDolar] = useState<number | undefined>(inicial?.cotizacionDolar)
   const [cotizacionFecha, setCotizacionFecha] = useState(inicial?.cotizacionFecha ?? '')
   const [consultandoCotizacion, setConsultandoCotizacion] = useState(false)
-  const [precargandoCotizacion, setPrecargandoCotizacion] = useState(false)
   const [ajusteGeneral, setAjusteGeneral] = useState('')
   const [ganancia, setGanancia] = useState(formatearImporte(inicial?.ganancia ?? 0))
   const [plazo, setPlazo] = useState(inicial?.plazo ?? '')
@@ -100,11 +99,9 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   const proveedorPorItem = useMemo(() => new Map(catalogo.map((item) => [item.id, item.proveedor])), [catalogo])
 
   useEffect(() => {
-    if (tienePermiso(usuario, 'catalog.view')) {
-      repositorio.items.listar().then(setCatalogo).catch((e) => setError(mensajeError(e, 'No se pudo cargar el catálogo.')))
-    }
-    repositorio.clientes.listar().then(setClientes).catch((e) => setError(mensajeError(e, 'No se pudieron cargar los clientes guardados.')))
-  }, [usuario])
+    repositorio.items.listar().then(setCatalogo).catch((e) => setError(mensajeError(e, 'No se pudo cargar el catálogo.')))
+    repositorio.clientes.listar().then(setClientes).catch(() => {})
+  }, [])
   useEffect(() => {
     if (catalogo.length === 0) return
     setLineas((ls) => {
@@ -119,17 +116,6 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     })
   }, [catalogo, proveedorPorItem])
   useEffect(() => { if (!inicial && empresa?.validezDias) setValidez(String(empresa.validezDias)) }, [empresa?.validezDias, inicial])
-  useEffect(() => {
-    if (!itemUsdPendiente) return
-    let vigente = true
-    setPrecargandoCotizacion(true)
-    obtenerCotizacionBlue()
-      .catch((e: unknown) => {
-        if (vigente) setError(e instanceof Error ? e.message : mensajeError(e, 'No se pudo precargar la cotización del dólar blue.'))
-      })
-      .finally(() => { if (vigente) setPrecargandoCotizacion(false) })
-    return () => { vigente = false }
-  }, [itemUsdPendiente?.id])
 
   // El aviso de validación se va apenas el usuario corrige algo.
   useEffect(() => { setError('') }, [nombre, email, telefono, documento, direccion, lineas, ganancia])
@@ -236,19 +222,21 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     } catch (e) { setError(mensajeError(e, 'No se pudo guardar el ítem en el catálogo.')) }
   }
 
-  const problemas = (estado: 'borrador' | 'pendiente' | 'aceptado'): string => {
-    if (!nombre.trim()) return 'Falta el nombre del cliente.'
+  const problemas = (estado: 'borrador' | 'pendiente'): string => {
     if (lineas.length === 0) return 'Agregá al menos un ítem al presupuesto.'
     if (lineas.some((l) => !lineaValida(l))) return 'Revisá los ítems: cada uno necesita descripción, una cantidad mayor a 0 y un importe de 0 o más.'
     if (new Set(lineas.map((l) => normalizarMoneda(l.moneda))).size > 1) return 'Un presupuesto no puede mezclar precios de distintas monedas.'
     if (!Number.isFinite(parseImporte(ganancia)) || parseImporte(ganancia) < 0) return 'La ganancia tiene que ser un importe igual o mayor a 0.'
-    if (estado !== 'borrador') {
+    if (estado === 'pendiente') {
       if (pagoOpcion === OTRA_FORMA && !pagoOtra.trim()) return 'Escribí la forma de pago o elegí una de la lista.'
+      if (!nombre.trim()) return 'Falta el nombre completo del cliente.'
+      if (!EMAIL.test(email.trim())) return 'Falta un correo electrónico válido del cliente.'
+      if (!telefono.trim()) return 'Falta el teléfono del cliente.'
     }
     return ''
   }
 
-  const guardar = async (estado: 'borrador' | 'pendiente' | 'aceptado') => {
+  const guardar = async (estado: 'borrador' | 'pendiente') => {
     const p = problemas(estado)
     if (p) return setError(p)
     setError(''); setGuardando(true)
@@ -256,7 +244,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
       const datos = { nombre: nombre.trim(), email: email.trim(), telefono: telefono.trim(), documento: documento.trim(), direccion: direccion.trim() }
       let clienteId = clienteSel
       // Los clientes guardados exigen los tres datos: solo se actualizan o crean si están completos.
-      if (tienePermiso(usuario, 'clients.manage') && datos.nombre && EMAIL.test(datos.email) && datos.telefono) {
+      if (datos.nombre && EMAIL.test(datos.email) && datos.telefono) {
         if (clienteSel) await repositorio.clientes.actualizar(clienteSel, datos)
         else if (guardarCliente) clienteId = (await repositorio.clientes.crear(datos)).id
       }
@@ -304,25 +292,25 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
           </label>
         )}
         <div className="tres">
-          <label className="campo">Nombre completo <small>(obligatorio)</small>
+          <label className="campo">Nombre completo
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" maxLength={160} />
           </label>
-          <label className="campo">Correo electrónico <small>(opcional)</small>
+          <label className="campo">Correo electrónico
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
           </label>
-          <label className="campo">Teléfono <small>(opcional)</small>
+          <label className="campo">Teléfono
             <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} autoComplete="off" maxLength={40} />
           </label>
-          <label className="campo">DNI / CUIT / CUIL <small>(opcional)</small>
+          <label className="campo">DNI / CUIT / CUIL
             <input value={documento} onChange={(e) => setDocumento(e.target.value)} autoComplete="off" maxLength={40} />
           </label>
-          <label className="campo">Dirección <small>(opcional)</small>
+          <label className="campo">Dirección
             <input value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="street-address" maxLength={300} />
           </label>
         </div>
-        {tienePermiso(usuario, 'clients.manage') && (!clienteSel
+        {!clienteSel
           ? <label className="check"><input type="checkbox" checked={guardarCliente} onChange={(e) => setGuardarCliente(e.target.checked)} /> Guardar en mis clientes para la próxima</label>
-          : <p className="ayuda">Si cambiás estos datos, se actualizan también en el cliente guardado.</p>)}
+          : <p className="ayuda">Si cambiás estos datos, se actualizan también en el cliente guardado.</p>}
       </section>
 
       <section className="panel">
@@ -348,7 +336,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
                         </label>
                         <small>
                           <span className="pill pers">Personalizado</span>
-                          {tienePermiso(usuario, 'catalog.manage') && <button className="link" disabled={!lineaValida(l)} onClick={() => guardarEnCatalogo(l)}>Guardar en el catálogo</button>}
+                          <button className="link" disabled={!lineaValida(l)} onClick={() => guardarEnCatalogo(l)}>Guardar en el catálogo</button>
                         </small>
                       </>
                     )}
@@ -410,7 +398,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
                   Mantener en USD
                 </button>
                 <button type="button" className="btn chico" disabled={consultandoCotizacion || (lineas.length > 0 && monedaPresupuesto !== 'ARS')} onClick={() => { void agregarDelCatalogo(itemUsdPendiente.id, true) }}>
-                  {consultandoCotizacion ? 'Consultando cotización…' : precargandoCotizacion ? 'Preparando cotización…' : 'Convertir a ARS'}
+                  {consultandoCotizacion ? 'Consultando cotización…' : 'Convertir a ARS'}
                 </button>
                 <button type="button" className="btn sec chico" disabled={consultandoCotizacion} onClick={() => setItemUsdPendiente(null)}>Cancelar</button>
               </div>
@@ -463,10 +451,10 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
           <strong>{importeEnMoneda(total, monedaPresupuesto)}</strong>
           {requiereSena(pagoOpcion === OTRA_FORMA ? pagoOtra : pagoOpcion) && <small>Seña del 50%: {importeEnMoneda(Math.round(total * 50) / 100, monedaPresupuesto)}</small>}
         </div>
-        <div className={`botones${inicial?.estado === 'pendiente' || inicial?.estado === 'aceptado' ? ' una-accion' : ''}`}>
+        <div className={`botones${inicial?.estado === 'pendiente' ? ' una-accion' : ''}`}>
           {error && <p className="error" role="alert">{error}</p>}
-          {inicial?.estado === 'pendiente' || inicial?.estado === 'aceptado'
-            ? <button className="btn chico" disabled={guardando} onClick={() => guardar(inicial?.estado === 'aceptado' ? 'aceptado' : 'pendiente')}>{guardando ? 'Guardando…' : 'Guardar cambios'}</button>
+          {inicial?.estado === 'pendiente'
+            ? <button className="btn chico" disabled={guardando} onClick={() => guardar('pendiente')}>{guardando ? 'Guardando…' : 'Guardar cambios'}</button>
             : <>
                 <button className="btn sec chico" disabled={guardando} onClick={() => guardar('borrador')}>Guardar borrador</button>
                 <button className="btn chico" disabled={guardando} onClick={() => guardar('pendiente')}>{guardando ? 'Guardando…' : 'Emitir presupuesto'}</button>
@@ -500,7 +488,7 @@ function Listo({ presupuesto, alNuevo }: { presupuesto: Presupuesto; alNuevo: ()
       <section className="listo" role="status">
         <h1>Presupuesto N° {String(presupuesto.numero).padStart(4, '0')} guardado</h1>
         <p className="sub">
-          Quedó como <strong>{presupuesto.estado === 'borrador' ? 'borrador' : presupuesto.estado === 'aceptado' ? 'aceptado' : 'pendiente'}</strong>
+          Quedó como <strong>{presupuesto.estado === 'borrador' ? 'borrador' : 'pendiente'}</strong>
           {presupuesto.clienteDatos.nombre ? <> para {presupuesto.clienteDatos.nombre}</> : null} por <strong>{importeEnMoneda(presupuesto.total, presupuesto.moneda)}</strong>.
         </p>
         <div className="botones izq">

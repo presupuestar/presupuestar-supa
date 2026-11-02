@@ -8,6 +8,8 @@ La app usa `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` desde `app/.env
 
 El proyecto ya tiene las migraciones iniciales y los datos importados. No vuelvas a ejecutar manualmente las migraciones iniciales ni `migrate-pocketbase-a-supabase` sobre la base poblada. Aplicá las migraciones pendientes con el flujo de Supabase CLI (`supabase db push`) después de vincular el proyecto correcto y revisar el SQL. PocketBase se conserva como respaldo histórico.
 
+Si una base existente no tiene historial de migraciones, no ejecutes `db push` sin revisar primero `npx supabase migration list --remote=eqsxzfhpsfaxazzqvnyo`: podría intentar recrear el esquema inicial sobre datos existentes. Verificá en el SQL Editor que las migraciones base ya estén aplicadas; solo entonces registralas con `npx supabase migration repair 20261102100000 20261102110000 --status applied --remote=eqsxzfhpsfaxazzqvnyo` y aplicá las pendientes con `npx supabase db push --remote=eqsxzfhpsfaxazzqvnyo`.
+
 ## Edge Functions
 
 - `manage-team`: el administrador de empresa crea empleados, restablece sus contraseñas y los elimina.

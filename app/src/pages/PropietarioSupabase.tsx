@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ClaveDialog } from '../components/ClaveDialog'
 import { Isotipo } from '../components/Isotipo'
-import { PreferenciasVisuales, VolverArriba } from '../components/PreferenciasVisuales'
+import { VolverArriba } from '../components/PreferenciasVisuales'
 import { useSesion } from '../context/Sesion'
 import { generarClave } from '../lib/clave'
 import { mensajeError } from '../lib/errores'
@@ -89,6 +89,16 @@ export function PropietarioSupabase() {
   const [adminPassword, setAdminPassword] = useState(generarClave())
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const createDialog = useRef<HTMLDialogElement>(null)
+  const deleteDialog = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    if (showCreate && createDialog.current && !createDialog.current.open) createDialog.current.showModal()
+  }, [showCreate])
+
+  useEffect(() => {
+    if (confirmDelete && deleteDialog.current && !deleteDialog.current.open) deleteDialog.current.showModal()
+  }, [confirmDelete])
 
   const loadCompanies = async () => {
     const [companyResult, profileResult, itemResult, clientResult, quoteResult] = await Promise.all([
@@ -214,7 +224,7 @@ export function PropietarioSupabase() {
     <div className="app panel-propietario">
       <header className="barra">
         <Link className="marca" to="/propietario"><Isotipo size={32} /><strong>PresupuestAR · Propietario</strong></Link>
-        <span className="usuario"><PreferenciasVisuales /> {usuario.email} <button className="link" onClick={salir}>Salir</button></span>
+        <span className="usuario">{usuario.email} <button className="link" onClick={salir}>Salir</button></span>
       </header>
       {id && company ? (
         <main className="contenido ancho">
@@ -253,7 +263,7 @@ export function PropietarioSupabase() {
           </table></div>
         </main>
       )}
-      {showCreate && <dialog className="ventana" open><form onSubmit={(event) => void createCompany(event)} className="form">
+      {showCreate && <dialog ref={createDialog} className="ventana" onClose={() => setShowCreate(false)}><form onSubmit={(event) => void createCompany(event)} className="form">
         <h2>Nueva empresa</h2>
         <label className="campo">Nombre de la empresa<input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={120} /></label>
         <label className="campo">Nombre del administrador<input value={adminName} onChange={(e) => setAdminName(e.target.value)} required maxLength={120} /></label>
@@ -262,8 +272,16 @@ export function PropietarioSupabase() {
         {error && <p className="error" role="alert">{error}</p>}
         <div className="botones"><button type="button" className="btn sec chico" onClick={() => setShowCreate(false)}>Cancelar</button><button className="btn chico" disabled={busy}>{busy ? 'Creando…' : 'Crear empresa'}</button></div>
       </form></dialog>}
-      {confirmDelete && company && <dialog className="ventana" open><div className="form">
-        <h2>Eliminar {company.name}</h2><p>Se eliminarán permanentemente la empresa, sus usuarios y sus datos. Esta acción no se puede deshacer.</p>
+      {confirmDelete && company && <dialog
+        ref={deleteDialog}
+        className="ventana"
+        aria-labelledby="eliminar-empresa-titulo"
+        aria-describedby="eliminar-empresa-descripcion"
+        onClose={() => setConfirmDelete(false)}
+        onCancel={(event) => { if (busy) event.preventDefault() }}
+        onClick={(event) => { if (event.target === deleteDialog.current && !busy) deleteDialog.current?.close() }}
+      ><div className="form">
+        <h2 id="eliminar-empresa-titulo">Eliminar {company.name}</h2><p id="eliminar-empresa-descripcion">Se eliminarán permanentemente la empresa, sus usuarios y sus datos. Esta acción no se puede deshacer.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="botones"><button className="btn sec chico" disabled={busy} onClick={() => setConfirmDelete(false)}>Cancelar</button><button className="btn chico peligro" disabled={busy} onClick={() => void deleteCompany()}>{busy ? 'Eliminando…' : 'Eliminar empresa y datos'}</button></div>
       </div></dialog>}

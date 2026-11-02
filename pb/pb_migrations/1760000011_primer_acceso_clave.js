@@ -5,8 +5,8 @@ migrate((app) => {
   const users = app.findCollectionByNameOrId('users')
   if (!users.fields.getByName('primerAccesoClaveRespondido')) {
     users.fields.add(new BoolField({ name: 'primerAccesoClaveRespondido' }))
-    app.save(users)
     app.db().newQuery('UPDATE users SET primerAccesoClaveRespondido = 1').execute()
+    app.save(users)
   }
 }, (app) => {
   const users = app.findCollectionByNameOrId('users')
