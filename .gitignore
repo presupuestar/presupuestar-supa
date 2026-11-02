@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+app/.env.local
+pb/pb_data/
+pb/pocketbase
+pb/pocketbase.exe
+pb/pb_public/

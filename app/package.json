@@ -1,0 +1,31 @@
+{
+  "name": "presupuestar-app",
+  "version": "0.1.0",
+  "description": "PresupuestAR · app web de presupuestos",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "deploy:pockethost": "npm run build && node scripts/desplegar-pockethost.mjs",
+    "preview": "vite preview",
+    "tipos": "tsc --noEmit",
+    "build:pb": "npm run build && node scripts/copiar-a-pb.mjs"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
+    "pdfjs-dist": "^6.4.299",
+    "pocketbase": "^0.28.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  },
+  "private": true,
+  "type": "module"
+}
