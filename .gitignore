@@ -1,7 +1,14 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+supabase/.env
+supabase/.temp/
+supabase/migration_data/
 app/.env.local
+app/.env.*
+!app/.env.example
 pb/pb_data/
 pb/pocketbase
 pb/pocketbase.exe
