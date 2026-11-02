@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useSesion } from '../context/Sesion'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { Layout } from '../components/Layout'
 import { importeEnMoneda, normalizarMoneda } from '../lib/formato'
+import { mensajeError } from '../lib/errores'
 import { repositorio } from '../lib/repositorio'
 import type { ResumenMes } from '../lib/tipos'
 
@@ -14,11 +15,18 @@ export function Inicio() {
   const [items, setItems] = useState<number | null>(null)
   const [presupuestos, setPresupuestos] = useState<number | null>(null)
   const [meses, setMeses] = useState<ResumenMes[]>([])
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    repositorio.items.contar().then(setItems)
-    repositorio.presupuestos.listar().then((l) => { setPresupuestos(l.length); setMeses(repositorio.resumenMensual(l)) })
-  }, [])
+    if (tienePermiso(usuario, 'catalog.view')) {
+      repositorio.items.contar().then(setItems).catch((e) => setError(mensajeError(e, 'No se pudo cargar el catálogo.')))
+    }
+    if (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) {
+      repositorio.presupuestos.listar()
+        .then((l) => { setPresupuestos(l.length); setMeses(repositorio.resumenMensual(l)) })
+        .catch((e) => setError(mensajeError(e, 'No se pudo cargar el resumen de presupuestos.')))
+    }
+  }, [usuario])
 
   const mes = meses[0]
   const resumenMes = mes ? meses.filter((m) => m.mes === mes.mes) : []
@@ -29,21 +37,22 @@ export function Inicio() {
   return (
     <Layout>
       <main className="contenido inicio">
+        {error && <p className="error" role="alert">{error}</p>}
         <div className="encabezado">
           <div>
             <h1>Hola{empresa ? `, ${empresa.nombre}` : ''}</h1>
-            <p className="sub">{usuario?.rol === 'admin' ? 'Un resumen de toda la empresa.' : 'Un resumen de los presupuestos que hiciste vos.'}</p>
+            <p className="sub">{tienePermiso(usuario, 'quotes.view_all') ? 'Un resumen de toda la empresa.' : 'Un resumen de los presupuestos que hiciste vos.'}</p>
           </div>
-          <Link className="btn chico" to="/nuevo">Nuevo presupuesto</Link>
+          {tienePermiso(usuario, 'quotes.create') && <Link className="btn chico" to="/nuevo">Nuevo presupuesto</Link>}
         </div>
 
         <div className="tarjetas">
-          <article><span>Ítems en el catálogo</span><strong>{items ?? '…'}</strong></article>
-          <article><span>Presupuestos guardados</span><strong>{presupuestos ?? '…'}</strong></article>
+          {tienePermiso(usuario, 'catalog.view') && <article><span>Ítems en el catálogo</span><strong>{items ?? '…'}</strong></article>}
+          {(tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && <article><span>Presupuestos guardados</span><strong>{presupuestos ?? '…'}</strong></article>}
           <article><span>Conversión {mes ? `(${nombreMes(mes.mes)})` : ''}</span><strong>{mes ? `${conversionMes}%` : '—'}</strong></article>
         </div>
 
-        {mes && (
+        {mes && (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && (
           <section className="resumen">
             <div className="encabezado"><h2>Resumen de {nombreMes(mes.mes)}</h2><Link className="link" to="/historial">Ver historial completo</Link></div>
             {resumenMes.map((m) => (

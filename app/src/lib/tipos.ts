@@ -1,5 +1,18 @@
 export type Estado = 'borrador' | 'pendiente' | 'aceptado' | 'rechazado'
 
+export const PERMISOS_EMPRESA = [
+  { codigo: 'catalog.view', nombre: 'Ver catálogo' },
+  { codigo: 'catalog.manage', nombre: 'Administrar catálogo' },
+  { codigo: 'clients.manage', nombre: 'Administrar clientes' },
+  { codigo: 'quotes.create', nombre: 'Crear presupuestos (incluye ver los propios)' },
+  { codigo: 'quotes.view_own', nombre: 'Ver presupuestos propios' },
+  { codigo: 'quotes.view_all', nombre: 'Ver presupuestos de todo el equipo' },
+  { codigo: 'quotes.update_own', nombre: 'Editar presupuestos propios' },
+  { codigo: 'quotes.delete_own', nombre: 'Eliminar presupuestos propios' },
+] as const
+
+export type PermisoEmpresa = typeof PERMISOS_EMPRESA[number]['codigo']
+
 export interface Empresa {
   id: string
   nombre: string
@@ -89,10 +102,16 @@ export interface UsuarioEquipo {
   id: string
   email: string
   name?: string
-  rol: 'admin' | 'miembro'
+  rol: string
   primerAccesoClaveRespondido?: boolean
   empresa: string
   created: string
+}
+
+export interface RolEmpresa {
+  id: string
+  nombre: string
+  permisos: PermisoEmpresa[]
 }
 
 /** Ventas de una persona del equipo: "vendido" es lo que el cliente aceptó. */

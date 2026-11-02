@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Layout } from '../components/Layout'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseImporte } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
+import { validarCodigoMoneda } from '../lib/moneda'
 import type { Item } from '../lib/tipos'
 
 const UNIDADES = ['unidad', 'hora', 'día', 'mes', 'año', 'm²', 'kg']
@@ -36,6 +38,8 @@ interface CandidatoImportacion {
 }
 
 export function Catalogo() {
+  const { usuario } = useSesion()
+  const puedeAdministrar = tienePermiso(usuario, 'catalog.manage')
   const pdfInput = useRef<HTMLInputElement>(null)
   const revisionFinal = useRef<HTMLDivElement>(null)
   const confirmacionRef = useRef<HTMLDialogElement>(null)
@@ -288,6 +292,8 @@ export function Catalogo() {
     if (!mayoristaImportacion) return setError('Seleccioná un mayorista existente o escribí el nombre de uno nuevo antes de cargar los materiales.')
     const seleccionados = candidatos.filter((c) => c.seleccionado)
     if (seleccionados.length === 0) return setError('Seleccioná al menos un material para cargar.')
+    const monedaInvalida = seleccionados.find((c) => !validarCodigoMoneda(c.moneda))
+    if (monedaInvalida) return setError(`Ingresá un código ISO 4217 válido para «${monedaInvalida.nombre}».`)
     const invalidos = seleccionados.find((c) => !c.nombre.trim() || !Number.isFinite(parseImporte(c.precio)) || parseImporte(c.precio) < 0)
     if (invalidos) return setError('Revisá los materiales seleccionados: cada uno necesita nombre e importe igual o mayor a 0.')
 
@@ -423,11 +429,12 @@ export function Catalogo() {
             <h1>Catálogo</h1>
             <p className="sub">Los ítems que cargás una vez y después elegís al armar cada presupuesto.</p>
           </div>
-          <div className="encabezado-acciones">
+          {puedeAdministrar && <div className="encabezado-acciones">
             <button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Nuevo ítem</button>
-          </div>
+          </div>}
         </div>
 
+        {puedeAdministrar && <>
         <details className="panel importador-pdf catalogo-desplegable" id="pdf-catalogo" ref={importadorPdf}>
           <summary className="catalogo-desplegable-resumen" onClick={(e) => {
             if (leyendoPdf || guardandoPdf) e.preventDefault()
@@ -491,7 +498,8 @@ export function Catalogo() {
                           {c.error && <small className="importacion-error" role="alert"><strong>No se pudo cargar:</strong> {c.error}</small>}
                         </td>
                         <td><input className="importacion-campo precio" aria-label={`Precio de ${c.nombre}`} inputMode="decimal" value={c.precio} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, precio: e.target.value } : x))} /></td>
-                        <td><span className="pill pers">{c.moneda}</span></td>
+                        <td><input className="importacion-campo moneda" value={c.moneda} maxLength={3} aria-label={`Moneda ISO 4217 de ${c.nombre}`}
+                          onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, moneda: e.target.value.toUpperCase() } : x))} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -525,6 +533,7 @@ export function Catalogo() {
           {mensajeImportacion && candidatos.length === 0 && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
           </div>
         </details>
+        </>}
 
         <div className="filtros">
           <input type="search" placeholder="Buscar ítem…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar ítem" />
@@ -539,7 +548,7 @@ export function Catalogo() {
           <button type="button" className="btn sec chico" disabled={cargandoItems || paginaItems >= totalPaginasItems - 1} onClick={() => setPaginaItems((pagina) => Math.min(totalPaginasItems - 1, pagina + 1))}>Siguiente</button>
         </div>}
 
-        <details className="acciones-catalogo-plegable catalogo-desplegable">
+        {puedeAdministrar && <details className="acciones-catalogo-plegable catalogo-desplegable">
           <summary className="catalogo-desplegable-resumen">
             <span>
               <strong>Acciones de selección</strong>
@@ -567,7 +576,7 @@ export function Catalogo() {
             </button>
           </div>
         </div>
-        </details>
+        </details>}
 
         <dialog
           ref={confirmacionRef}
@@ -608,7 +617,7 @@ export function Catalogo() {
               {productos.map((i) => (
                 <tr key={i.id} className={`${i.activo ? '' : 'apagado'}${seleccionados.has(i.id) ? ' seleccionado' : ''}`}>
                   <td className="catalogo-nombre">
-                    <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>
+                    {puedeAdministrar && <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>}
                     <span className="catalogo-identidad"><strong>{i.nombre}</strong>{i.descripcion && <small>{i.descripcion}</small>}</span>
                   </td>
                   <td className="catalogo-proveedor" data-label="Proveedor / mayorista">{i.proveedor?.trim() || <span className="sin-dato">Sin asignar</span>}</td>
@@ -616,6 +625,7 @@ export function Catalogo() {
                   <td className="catalogo-precio num" data-label="Precio">{importeEnMoneda(i.precio, i.moneda)}</td>
                   <td className="catalogo-estado" data-label="Estado"><span className={`pill ${i.activo ? 'on' : 'off'}`}>{i.activo ? 'Activo' : 'Desactivado'}</span></td>
                   <td className="catalogo-acciones-fila">
+                    {puedeAdministrar && <>
                     <button className="link" onClick={() => setEditando(i)}>Editar</button>
                     <details className="catalogo-menu-fila">
                       <summary>Más</summary>
@@ -624,6 +634,7 @@ export function Catalogo() {
                         <button className="link peligro" onClick={() => eliminar(i)}>Eliminar</button>
                       </div>
                     </details>
+                    </>}
                   </td>
                 </tr>
               ))}
@@ -639,7 +650,7 @@ export function Catalogo() {
         </div>}
       </main>
 
-      {editando && (
+      {puedeAdministrar && editando && (
         <FormItem
           item={editando === 'nuevo' ? null : editando}
           alCerrar={() => setEditando(null)}
@@ -668,9 +679,11 @@ function FormItem({ item, alCerrar, alGuardar }: { item: Item | null; alCerrar: 
     const valor = parseImporte(precio)
     if (!nombre.trim()) return setError('Poné un nombre para el ítem.')
     if (!Number.isFinite(valor) || valor < 0) return setError('El precio tiene que ser un número igual o mayor a 0.')
+    const monedaValida = validarCodigoMoneda(moneda)
+    if (!monedaValida) return setError('Ingresá un código de moneda ISO 4217 válido de tres letras, como ARS, USD o EUR.')
     setError(''); setGuardando(true)
     try {
-      const datos = { nombre: nombre.trim(), descripcion: descripcion.trim(), proveedor: proveedor.trim(), unidad: unidad.trim(), precio: valor, moneda }
+      const datos = { nombre: nombre.trim(), descripcion: descripcion.trim(), proveedor: proveedor.trim(), unidad: unidad.trim(), precio: valor, moneda: monedaValida }
       if (item) await repositorio.items.actualizar(item.id, datos)
       else await repositorio.items.crear({ ...datos, activo: true })
       alGuardar()
@@ -696,9 +709,9 @@ function FormItem({ item, alCerrar, alGuardar }: { item: Item | null; alCerrar: 
               onBlur={() => { const n = parseImporte(precio); if (Number.isFinite(n)) setPrecio(formatearImporte(n)) }} />
           </label>
           <label className="campo">Moneda
-            <select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
-              {['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'UYU', 'PYG', 'BOB', 'COP', 'MXN', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'CNY'].map((codigo) => <option key={codigo} value={codigo}>{codigo}</option>)}
-            </select>
+            <input value={moneda} onChange={(e) => setMoneda(e.target.value.toUpperCase())} maxLength={3} minLength={3} list="monedas-iso" placeholder="ARS" />
+            <datalist id="monedas-iso">{['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'UYU', 'PYG', 'BOB', 'COP', 'MXN', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'CNY', 'PEN', 'UYU', 'ZAR', 'INR', 'KRW', 'NZD', 'SEK', 'NOK', 'DKK', 'PLN', 'TRY'].map((codigo) => <option key={codigo} value={codigo} />)}</datalist>
+            <small>Usá un código ISO 4217 de tres letras.</small>
           </label>
           <label className="campo">Unidad
             <input value={unidad} onChange={(e) => setUnidad(e.target.value)} list="unidades" maxLength={30} />

@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { normalizarMoneda } from './formato'
-import type { Cliente, Empresa, Estado, Item, Linea, Presupuesto, ResumenMes, ResumenVendedor, UsuarioEquipo } from './tipos'
+import { PERMISOS_EMPRESA, type Cliente, type Empresa, type Estado, type Item, type Linea, type PermisoEmpresa, type Presupuesto, type ResumenMes, type ResumenVendedor, type RolEmpresa, type UsuarioEquipo } from './tipos'
 
 type DbRow = Record<string, unknown>
 
@@ -124,6 +124,16 @@ const presupuestoAColumna = (d: Partial<Presupuesto>) => ({
 
 const dinero = (n: number) => Math.round(n * 100) / 100
 const escaparLike = (value: string) => value.replace(/[\\%_,]/g, '\\$&').replace(/"/g, '\\"')
+const permisosMiembro = PERMISOS_EMPRESA
+  .map(({ codigo }) => codigo)
+  .filter((codigo) => codigo !== 'quotes.view_all') as PermisoEmpresa[]
+const rolDesdeDb = (r: DbRow): RolEmpresa => ({
+  id: String(r.id),
+  nombre: String(r.name),
+  permisos: Array.isArray(r.permissions)
+    ? r.permissions.filter((value): value is PermisoEmpresa => PERMISOS_EMPRESA.some((p) => p.codigo === value))
+    : [],
+})
 
 export const totalLineas = (lineas: Linea[]) =>
   dinero(lineas.reduce((suma, linea) => suma + linea.cantidad * linea.precioUnitario, 0))
@@ -234,15 +244,21 @@ export const repositorio = {
         id: String(r.user_id),
         email: String(r.email ?? ''),
         name: String(r.name ?? ''),
-        rol: r.role === 'admin' ? 'admin' : 'miembro',
+        rol: String(r.role),
         primerAccesoClaveRespondido: Boolean(r.first_access_password_answered),
         empresa: String(r.company_id ?? ''),
         created: String(r.created_at ?? ''),
       }))
     },
-    async crear(datos: { email: string; password: string; name: string }) {
+    async crear(datos: { email: string; password: string; name: string; role?: string }) {
       const { error } = await supabase.functions.invoke('manage-team', {
         body: { action: 'create', ...datos },
+      })
+      if (error) throw error
+    },
+    async cambiarRol(id: string, role: string) {
+      const { error } = await supabase.functions.invoke('manage-team', {
+        body: { action: 'set-role', userId: id, role },
       })
       if (error) throw error
     },
@@ -254,6 +270,27 @@ export const repositorio = {
       const { error } = await supabase.functions.invoke('manage-team', {
         body: { action: 'reset-password', userId: id, password },
       })
+      if (error) throw error
+    },
+  },
+
+  roles: {
+    async listar(): Promise<RolEmpresa[]> {
+      return errorResult(await supabase.from('company_roles').select('id,name,permissions').order('name')).map(rolDesdeDb)
+    },
+    async crear(datos: { nombre: string; permisos: PermisoEmpresa[] }) {
+      const id = await empresaId()
+      return rolDesdeDb(errorResult(await supabase.from('company_roles')
+        .insert({ company_id: id, name: datos.nombre.trim(), permissions: datos.permisos })
+        .select('id,name,permissions').single()))
+    },
+    async actualizar(id: string, datos: { nombre: string; permisos: PermisoEmpresa[] }) {
+      return rolDesdeDb(errorResult(await supabase.from('company_roles')
+        .update({ name: datos.nombre.trim(), permissions: datos.permisos }).eq('id', id)
+        .select('id,name,permissions').single()))
+    },
+    async eliminar(id: string) {
+      const { error } = await supabase.from('company_roles').delete().eq('id', id)
       if (error) throw error
     },
   },
@@ -270,6 +307,10 @@ export const repositorio = {
     async actualizar(id: string, d: Partial<Cliente>) {
       return clienteDesdeDb(errorResult(await supabase.from('clients')
         .update(clienteAColumna(d)).eq('id', id).select('*').single()))
+    },
+    async eliminar(id: string) {
+      const { error } = await supabase.from('clients').delete().eq('id', id)
+      if (error) throw error
     },
   },
 
@@ -305,7 +346,8 @@ export const repositorio = {
     email: string
     name: string
     empresa: string
-    rol: 'admin' | 'miembro' | 'propietario'
+    rol: string
+    permisos: PermisoEmpresa[]
     primerAccesoClaveRespondido: boolean
   }> {
     const result = await supabase.from('profiles')
@@ -313,12 +355,30 @@ export const repositorio = {
       .eq('user_id', user.id).single()
     const profile = errorResult(result)
     const owner = errorResult(await supabase.rpc('is_platform_owner'))
+    let permisos: PermisoEmpresa[] = []
+    if (!owner) {
+      if (profile.role === 'admin') permisos = PERMISOS_EMPRESA.map(({ codigo }) => codigo)
+      else if (profile.role === 'member') permisos = permisosMiembro
+      else {
+        const role = await supabase.from('company_roles').select('permissions')
+          .eq('company_id', String(profile.company_id ?? '')).eq('id', String(profile.role)).maybeSingle()
+        if (role.error) throw role.error
+        if (!role.data) throw new Error('El rol de este usuario ya no existe. Pedile al administrador que lo asigne a otro.')
+        permisos = Array.isArray(role.data.permissions)
+          ? role.data.permissions.filter((value): value is PermisoEmpresa => PERMISOS_EMPRESA.some((p) => p.codigo === value))
+          : []
+        if (permisos.includes('quotes.create') && !permisos.includes('quotes.view_own')) {
+          permisos = [...permisos, 'quotes.view_own']
+        }
+      }
+    }
     return {
       id: user.id,
       email: user.email ?? '',
       name: String(profile.name ?? ''),
       empresa: profile.company_id ? String(profile.company_id) : '',
-      rol: owner ? 'propietario' : profile.role === 'admin' ? 'admin' : 'miembro',
+      rol: owner ? 'propietario' : String(profile.role),
+      permisos,
       primerAccesoClaveRespondido: Boolean(profile.first_access_password_answered),
     }
   },

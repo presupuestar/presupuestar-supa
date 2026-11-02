@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ClaveDialog } from '../components/ClaveDialog'
 import { Isotipo } from '../components/Isotipo'
+import { PreferenciasVisuales, VolverArriba } from '../components/PreferenciasVisuales'
 import { useSesion } from '../context/Sesion'
 import { generarClave } from '../lib/clave'
 import { mensajeError } from '../lib/errores'
@@ -197,7 +198,7 @@ export function PropietarioSupabase() {
     <div className="app panel-propietario">
       <header className="barra">
         <Link className="marca" to="/propietario"><Isotipo size={32} /><strong>PresupuestAR · Propietario</strong></Link>
-        <span className="usuario">{usuario.email} <button className="link" onClick={salir}>Salir</button></span>
+        <span className="usuario"><PreferenciasVisuales /> {usuario.email} <button className="link" onClick={salir}>Salir</button></span>
       </header>
       {id && company ? (
         <main className="contenido ancho">
@@ -250,6 +251,7 @@ export function PropietarioSupabase() {
         {error && <p className="error" role="alert">{error}</p>}
         <div className="botones"><button className="btn sec chico" disabled={busy} onClick={() => setConfirmDelete(false)}>Cancelar</button><button className="btn chico peligro" disabled={busy} onClick={() => void deleteCompany()}>{busy ? 'Eliminando…' : 'Eliminar empresa y datos'}</button></div>
       </div></dialog>}
+      <VolverArriba />
     </div>
   )
 }

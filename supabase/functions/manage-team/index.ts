@@ -56,15 +56,23 @@ Deno.serve(async (request: Request) => {
     const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : ''
     const password = typeof payload.password === 'string' ? payload.password : ''
     const name = typeof payload.name === 'string' ? payload.name.trim() : ''
+    const role = typeof payload.role === 'string' ? payload.role : 'member'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 72 || !name) {
       return json({ error: 'Revisá el nombre, correo y contraseña (8 a 72 caracteres).' }, 400)
+    }
+    if (role === 'admin') return json({ error: 'No se puede crear otra cuenta de administrador desde esta acción.' }, 400)
+    if (role !== 'member') {
+      const { data: companyRole, error: roleError } = await adminClient
+        .from('company_roles').select('id').eq('id', role).eq('company_id', profile.company_id).maybeSingle()
+      if (roleError) return json({ error: roleError.message }, 400)
+      if (!companyRole) return json({ error: 'El rol seleccionado no existe para esta empresa.' }, 400)
     }
 
     const { data, error } = await adminClient.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      app_metadata: { company_id: profile.company_id, role: 'member' },
+      app_metadata: { company_id: profile.company_id, role },
       user_metadata: { name },
     })
     if (error) return json({ error: error.message }, 400)
@@ -77,8 +85,29 @@ Deno.serve(async (request: Request) => {
     .select('company_id,role')
     .eq('user_id', userId)
     .single()
-  if (targetError || target.company_id !== profile.company_id || target.role !== 'member') {
+  if (targetError || target.company_id !== profile.company_id || target.role === 'admin') {
     return json({ error: 'No se encontró un empleado de esta empresa.' }, 404)
+  }
+
+  if (action === 'set-role') {
+    const role = typeof payload.role === 'string' ? payload.role : ''
+    if (!role) return json({ error: 'Seleccioná un rol válido.' }, 400)
+    if (role === 'admin') return json({ error: 'El rol de administrador no se puede asignar desde esta acción.' }, 400)
+    if (role !== 'member') {
+      const { data: companyRole, error: roleError } = await adminClient
+        .from('company_roles').select('id').eq('id', role).eq('company_id', profile.company_id).maybeSingle()
+      if (roleError) return json({ error: roleError.message }, 400)
+      if (!companyRole) return json({ error: 'El rol seleccionado no existe para esta empresa.' }, 400)
+    }
+    const { error: updateError } = await adminClient.from('profiles').update({ role }).eq('user_id', userId)
+    if (updateError) return json({ error: updateError.message }, 400)
+    const { data: authUser, error: authGetError } = await adminClient.auth.admin.getUserById(userId)
+    if (authGetError) return json({ error: authGetError.message }, 400)
+    const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(userId, {
+      app_metadata: { ...authUser.user.app_metadata, company_id: profile.company_id, role },
+    })
+    if (authUpdateError) return json({ error: authUpdateError.message }, 400)
+    return json({ ok: true })
   }
 
   if (action === 'delete') {

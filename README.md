@@ -12,7 +12,7 @@ pb/        PocketBase anterior, conservado como respaldo y origen histórico
 
 Los datos de PocketBase ya se importaron a Supabase. La verificación registrada fue de 5 empresas, 10 perfiles (incluido el propietario), 6.279 ítems, 9 clientes, 16 presupuestos, 10 cuentas Auth y 5 logos. PocketBase se conserva intacto como respaldo; no hace falta iniciarlo para desarrollar ni usar la app migrada.
 
-La app usa Supabase en todas sus pantallas activas: inicio de sesión y recuperación de contraseña, catálogo, equipo, clientes y presupuestos; el propietario puede gestionar empresas, marca, usuarios y consultar sus datos. Los roles y las políticas RLS separan los datos por empresa. Las acciones privilegiadas se ejecutan en Edge Functions; la clave de servicio no se expone al navegador.
+La app usa Supabase en todas sus pantallas activas: inicio de sesión y recuperación de contraseña, catálogo, equipo, clientes y presupuestos; el propietario puede gestionar empresas, marca, usuarios y consultar sus datos. Los roles personalizados permiten asignar permisos por función y las políticas RLS los aplican a los datos por empresa. Las acciones privilegiadas se ejecutan en Edge Functions; la clave de servicio no se expone al navegador.
 
 ## Ejecutar localmente
 

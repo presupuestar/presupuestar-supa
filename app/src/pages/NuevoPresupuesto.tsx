@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
-import { useSesion } from '../context/Sesion'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseCantidad, parseImporte } from '../lib/formato'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
@@ -57,7 +57,7 @@ export function NuevoPresupuesto() {
 }
 
 function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo: () => void }) {
-  const { empresa } = useSesion()
+  const { empresa, usuario } = useSesion()
   const [catalogo, setCatalogo] = useState<Item[]>([])
   const [busquedaItem, setBusquedaItem] = useState('')
   const [itemUsdPendiente, setItemUsdPendiente] = useState<Item | null>(null)
@@ -79,6 +79,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   const [cotizacionDolar, setCotizacionDolar] = useState<number | undefined>(inicial?.cotizacionDolar)
   const [cotizacionFecha, setCotizacionFecha] = useState(inicial?.cotizacionFecha ?? '')
   const [consultandoCotizacion, setConsultandoCotizacion] = useState(false)
+  const [precargandoCotizacion, setPrecargandoCotizacion] = useState(false)
   const [ajusteGeneral, setAjusteGeneral] = useState('')
   const [ganancia, setGanancia] = useState(formatearImporte(inicial?.ganancia ?? 0))
   const [plazo, setPlazo] = useState(inicial?.plazo ?? '')
@@ -99,9 +100,11 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   const proveedorPorItem = useMemo(() => new Map(catalogo.map((item) => [item.id, item.proveedor])), [catalogo])
 
   useEffect(() => {
-    repositorio.items.listar().then(setCatalogo).catch((e) => setError(mensajeError(e, 'No se pudo cargar el catálogo.')))
-    repositorio.clientes.listar().then(setClientes).catch(() => {})
-  }, [])
+    if (tienePermiso(usuario, 'catalog.view')) {
+      repositorio.items.listar().then(setCatalogo).catch((e) => setError(mensajeError(e, 'No se pudo cargar el catálogo.')))
+    }
+    repositorio.clientes.listar().then(setClientes).catch((e) => setError(mensajeError(e, 'No se pudieron cargar los clientes guardados.')))
+  }, [usuario])
   useEffect(() => {
     if (catalogo.length === 0) return
     setLineas((ls) => {
@@ -116,6 +119,17 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     })
   }, [catalogo, proveedorPorItem])
   useEffect(() => { if (!inicial && empresa?.validezDias) setValidez(String(empresa.validezDias)) }, [empresa?.validezDias, inicial])
+  useEffect(() => {
+    if (!itemUsdPendiente) return
+    let vigente = true
+    setPrecargandoCotizacion(true)
+    obtenerCotizacionBlue()
+      .catch((e: unknown) => {
+        if (vigente) setError(e instanceof Error ? e.message : mensajeError(e, 'No se pudo precargar la cotización del dólar blue.'))
+      })
+      .finally(() => { if (vigente) setPrecargandoCotizacion(false) })
+    return () => { vigente = false }
+  }, [itemUsdPendiente?.id])
 
   // El aviso de validación se va apenas el usuario corrige algo.
   useEffect(() => { setError('') }, [nombre, email, telefono, documento, direccion, lineas, ganancia])
@@ -242,7 +256,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
       const datos = { nombre: nombre.trim(), email: email.trim(), telefono: telefono.trim(), documento: documento.trim(), direccion: direccion.trim() }
       let clienteId = clienteSel
       // Los clientes guardados exigen los tres datos: solo se actualizan o crean si están completos.
-      if (datos.nombre && EMAIL.test(datos.email) && datos.telefono) {
+      if (tienePermiso(usuario, 'clients.manage') && datos.nombre && EMAIL.test(datos.email) && datos.telefono) {
         if (clienteSel) await repositorio.clientes.actualizar(clienteSel, datos)
         else if (guardarCliente) clienteId = (await repositorio.clientes.crear(datos)).id
       }
@@ -306,9 +320,9 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
             <input value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="street-address" maxLength={300} />
           </label>
         </div>
-        {!clienteSel
+        {tienePermiso(usuario, 'clients.manage') && (!clienteSel
           ? <label className="check"><input type="checkbox" checked={guardarCliente} onChange={(e) => setGuardarCliente(e.target.checked)} /> Guardar en mis clientes para la próxima</label>
-          : <p className="ayuda">Si cambiás estos datos, se actualizan también en el cliente guardado.</p>}
+          : <p className="ayuda">Si cambiás estos datos, se actualizan también en el cliente guardado.</p>)}
       </section>
 
       <section className="panel">
@@ -334,7 +348,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
                         </label>
                         <small>
                           <span className="pill pers">Personalizado</span>
-                          <button className="link" disabled={!lineaValida(l)} onClick={() => guardarEnCatalogo(l)}>Guardar en el catálogo</button>
+                          {tienePermiso(usuario, 'catalog.manage') && <button className="link" disabled={!lineaValida(l)} onClick={() => guardarEnCatalogo(l)}>Guardar en el catálogo</button>}
                         </small>
                       </>
                     )}
@@ -396,7 +410,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
                   Mantener en USD
                 </button>
                 <button type="button" className="btn chico" disabled={consultandoCotizacion || (lineas.length > 0 && monedaPresupuesto !== 'ARS')} onClick={() => { void agregarDelCatalogo(itemUsdPendiente.id, true) }}>
-                  {consultandoCotizacion ? 'Consultando cotización…' : 'Convertir a ARS'}
+                  {consultandoCotizacion ? 'Consultando cotización…' : precargandoCotizacion ? 'Preparando cotización…' : 'Convertir a ARS'}
                 </button>
                 <button type="button" className="btn sec chico" disabled={consultandoCotizacion} onClick={() => setItemUsdPendiente(null)}>Cancelar</button>
               </div>

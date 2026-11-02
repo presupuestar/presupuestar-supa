@@ -3,6 +3,9 @@ export interface CotizacionBlue {
   fecha: string
 }
 
+let cotizacionCache: { value: CotizacionBlue; expiresAt: number } | null = null
+let solicitudPendiente: Promise<CotizacionBlue> | null = null
+
 export function convertirUsdAArs(precioUsd: number, cotizacion: number): number {
   if (!Number.isFinite(precioUsd) || precioUsd < 0) throw new Error('El precio USD del ítem no es válido.')
   if (!Number.isFinite(cotizacion) || cotizacion < 100 || cotizacion > 100_000) {
@@ -14,6 +17,19 @@ export function convertirUsdAArs(precioUsd: number, cotizacion: number): number 
 }
 
 export async function obtenerCotizacionBlue(): Promise<CotizacionBlue> {
+  if (cotizacionCache && cotizacionCache.expiresAt > Date.now()) return cotizacionCache.value
+  if (solicitudPendiente) return solicitudPendiente
+  solicitudPendiente = cargarCotizacionBlue()
+  try {
+    const value = await solicitudPendiente
+    cotizacionCache = { value, expiresAt: Date.now() + 2 * 60 * 1000 }
+    return value
+  } finally {
+    solicitudPendiente = null
+  }
+}
+
+async function cargarCotizacionBlue(): Promise<CotizacionBlue> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 10_000)
   try {

@@ -3,14 +3,15 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { repositorio } from '../lib/repositorio'
 import { aplicarTema, restablecerTema } from '../lib/tema'
-import type { Empresa } from '../lib/tipos'
+import type { Empresa, PermisoEmpresa } from '../lib/tipos'
 
 export interface UsuarioSesion {
   id: string
   email: string
   name: string
   empresa: string
-  rol: 'admin' | 'miembro' | 'propietario'
+  rol: string
+  permisos: PermisoEmpresa[]
   primerAccesoClaveRespondido: boolean
 }
 
@@ -33,6 +34,9 @@ export const useSesion = () => {
 }
 
 const perfilDeUsuario = async (user: User) => repositorio.perfil(user)
+
+export const tienePermiso = (usuario: UsuarioSesion | null, permiso: PermisoEmpresa) =>
+  usuario?.rol === 'admin' || Boolean(usuario?.permisos.includes(permiso))
 
 export function SesionProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null)

@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
-import { useSesion } from '../context/Sesion'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
@@ -33,9 +33,25 @@ function SeccionDesplegable({ titulo, children }: { titulo: React.ReactNode; chi
   )
 }
 
+function GraficoBarras({ titulo, filas }: { titulo: string; filas: { etiqueta: string; valor: number; importe: string }[] }) {
+  const maximo = Math.max(0, ...filas.map((fila) => fila.valor))
+  return (
+    <section className="grafico-barras" aria-label={titulo}>
+      <h3>{titulo}</h3>
+      {filas.map((fila) => (
+        <div className="grafico-fila" key={fila.etiqueta} role="img" aria-label={`${fila.etiqueta}: ${fila.importe}`}>
+          <span className="grafico-etiqueta" title={fila.etiqueta}>{fila.etiqueta}</span>
+          <span className="grafico-pista"><span className="grafico-valor" style={{ width: `${maximo ? Math.max(fila.valor > 0 ? 2 : 0, fila.valor / maximo * 100) : 0}%` }} /></span>
+          <strong>{fila.importe}</strong>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export function Historial() {
   const { empresa, usuario } = useSesion()
-  const esAdmin = usuario?.rol === 'admin'
+  const esAdmin = tienePermiso(usuario, 'quotes.view_all')
   const [lista, setLista] = useState<Presupuesto[] | null>(null)
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -91,6 +107,11 @@ export function Historial() {
     }
     return [...total.entries()]
   }, [visibles])
+
+  const puedeEditar = (p: Presupuesto) =>
+    tienePermiso(usuario, 'quotes.update_own') && (usuario?.rol === 'admin' || p.vendedor === usuario?.id)
+  const puedeEliminar = (p: Presupuesto) =>
+    tienePermiso(usuario, 'quotes.delete_own') && (usuario?.rol === 'admin' || p.vendedor === usuario?.id)
 
   const cambiarEstado = async (p: Presupuesto, nuevo: Estado) => {
     setError('')
@@ -159,6 +180,17 @@ export function Historial() {
                   </tbody>
                 </table>
               </div>
+              <div className="graficos-resumen">
+                {[...new Set(resumen.map((r) => normalizarMoneda(r.moneda)))].map((moneda) => (
+                  <GraficoBarras key={moneda} titulo={`Presupuestado por mes · ${moneda}`} filas={
+                    resumen.filter((r) => normalizarMoneda(r.moneda) === moneda).map((r) => ({
+                      etiqueta: nombreMes(r.mes),
+                      valor: r.presupuestado,
+                      importe: importeEnMoneda(r.presupuestado, moneda),
+                    }))
+                  } />
+                ))}
+              </div>
               <p className="ayuda">Conversión = presupuestos aceptados sobre los emitidos en el mes (los borradores no cuentan). Tocá un mes para filtrar la lista.</p>
             </>
           )}
@@ -192,6 +224,19 @@ export function Historial() {
                       })}
                     </tbody>
                   </table>
+                </div>
+                <div className="graficos-resumen">
+                  {[...new Set(ranking.map((r) => normalizarMoneda(r.moneda)))].map((moneda) => (
+                    <GraficoBarras key={moneda} titulo={`Ventas aceptadas · ${moneda}`} filas={
+                      ranking.filter((r) => normalizarMoneda(r.moneda) === moneda)
+                        .sort((a, b) => b.vendido - a.vendido)
+                        .map((r) => ({
+                          etiqueta: r.nombre,
+                          valor: r.vendido,
+                          importe: importeEnMoneda(r.vendido, moneda),
+                        }))
+                    } />
+                  ))}
                 </div>
                 <p className="ayuda">"Vendido" es el total de los presupuestos que el cliente aceptó. Los borradores no cuentan. Tocá un mes del resumen para ver el ranking de ese mes, o una persona para filtrar la lista.</p>
               </>
@@ -235,20 +280,20 @@ export function Historial() {
                   <td className="campo-vendedor" data-label="Vendedor">{p.vendedorNombre || <span className="sin-dato">Sin asignar</span>}</td>
                   <td className="campo-total num" data-label="Total">{importeEnMoneda(p.total, p.moneda)}</td>
                   <td className="campo-estado" data-label="Estado">
-                    {p.estado === 'pendiente' && estaVencido(p.fechaEmision, p.validezDias ?? empresa?.validezDias, ahora)
+                    {puedeEditar(p) && p.estado === 'pendiente' && estaVencido(p.fechaEmision, p.validezDias ?? empresa?.validezDias, ahora)
                       ? <><span className="pill caducado" aria-label={`Presupuesto ${p.numero} caducado`}>Caducado</span><select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Cambiar estado del presupuesto ${p.numero}`}
                         onChange={(e) => cambiarEstado(p, e.target.value as Estado)}>
                         {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
                       </select></>
-                      : <select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Estado del presupuesto ${p.numero}`}
+                      : puedeEditar(p) ? <select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Estado del presupuesto ${p.numero}`}
                       onChange={(e) => cambiarEstado(p, e.target.value as Estado)}>
                       {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
-                    </select>}
+                    </select> : <span className={`pill ${p.estado}`}>{ETIQUETA[p.estado]}</span>}
                   </td>
                   <td className="acciones campo-acciones">
                     <button className="link" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
-                    {sePuedeEditar(p.estado) && <Link className="link" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
-                    <button className="link peligro" onClick={() => eliminar(p)}>Eliminar</button>
+                    {puedeEditar(p) && sePuedeEditar(p.estado) && <Link className="link" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
+                    {puedeEliminar(p) && <button className="link peligro" onClick={() => eliminar(p)}>Eliminar</button>}
                   </td>
                 </tr>
               ))}
