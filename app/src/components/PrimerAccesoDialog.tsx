@@ -26,7 +26,7 @@ export function PrimerAccesoDialog() {
     setError('')
     setGuardando(true)
     try {
-      await resolverPrimerAcceso(nuevaClave, claveActual)
+      await resolverPrimerAcceso(nuevaClave)
       ref.current?.close()
     } catch (e) {
       setError(mensajeError(e, 'No se pudo guardar la respuesta. Probá de nuevo.'))

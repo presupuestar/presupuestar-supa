@@ -9,7 +9,7 @@ const clase = ({ isActive }: { isActive: boolean }) => (isActive ? 'activo' : ''
 
 /** Barra superior + pie, compartidos por todas las pantallas internas. */
 export function Layout({ children }: { children: ReactNode }) {
-  const { usuario, empresa, salir } = useSesion()
+  const { usuario, empresa, salir, errorEmpresa } = useSesion()
   const [menuAbierto, setMenuAbierto] = useState(false)
   return (
     <div className="app">
@@ -27,6 +27,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
         <span className="usuario">{usuario?.email} <button className="link" onClick={salir}>Salir</button></span>
       </header>
+      {errorEmpresa && <p className="error" role="alert">{errorEmpresa}</p>}
       {children}
       <PrimerAccesoDialog />
       {empresa?.mostrarSello !== false && <footer className="pie"><SelloPresupuestar /></footer>}

@@ -135,7 +135,9 @@ function readCollectionId(name) {
   return collectionIds.get(name)
 }
 
-function mapCompany(record) {
+function mapCompany(record, quotes) {
+  const maxQuoteNumber = quotes.reduce((max, quote) =>
+    quote.empresa === record.id ? Math.max(max, Number(quote.numero) || 0) : max, 0)
   return {
     id: record.id,
     name: record.nombre,
@@ -149,6 +151,7 @@ function mapCompany(record) {
     validity_days: Number(record.validezDias) || null,
     terms: record.condiciones || null,
     show_seal: boolean(record.mostrarSello),
+    next_quote_number: maxQuoteNumber + 1,
     created_at: timestamp(record.created),
     updated_at: timestamp(record.updated),
   }
@@ -402,6 +405,7 @@ async function createOrMatchUsers(config, local, authUsers, state) {
       company_id: user.empresa,
       role: user.rol === 'admin' ? 'admin' : 'member',
       name: user.name || '',
+      email: user.email,
       first_access_password_answered: false,
       created_at: timestamp(user.created),
       updated_at: timestamp(user.updated),
@@ -424,6 +428,8 @@ async function createOrMatchUsers(config, local, authUsers, state) {
       ].map(csvCell).join(',')),
     ].join('\r\n') + '\r\n'
     writeFileSync(credentialsPath, csv, { mode: 0o600 })
+    state.credentials = {}
+    atomicJson(statePath, state)
   }
   return authIds
 }
@@ -487,7 +493,9 @@ async function main() {
   for (const name of collectionNames) console.log(`${name}: ${counts[name]}`)
   console.log(`Archivos adjuntos: ${attachments}`)
   console.log(`Cuentas Auth existentes preservadas: ${authUsers.length}`)
-  console.log('Destino Supabase: tablas vacías, salvo la cuenta propietaria y su perfil.')
+  console.log(state
+    ? 'Destino Supabase: ya contiene datos de esta migración, se validó que no haya registros ajenos.'
+    : 'Destino Supabase: tablas vacías, salvo la cuenta propietaria y su perfil.')
 
   if (process.argv.includes('--dry-run')) {
     console.log('Vista previa únicamente: no se creó ningún usuario, archivo ni registro.')
@@ -512,13 +520,14 @@ async function main() {
     atomicJson(statePath, state)
   }
 
-  await rest(config, 'companies', local.data.get('empresa').map(mapCompany))
+  const quoteRows = local.data.get('presupuestos')
+  await rest(config, 'companies', local.data.get('empresa').map((company) => mapCompany(company, quoteRows)))
   await uploadCompanyAssets(config, local)
   const latestAuthUsers = await listAuthUsers(config)
   const authIds = await createOrMatchUsers(config, local, latestAuthUsers, state)
   await rest(config, 'items', local.data.get('items').map(mapItem))
   await rest(config, 'clients', local.data.get('clientes').map(mapClient))
-  await rest(config, 'quotes', local.data.get('presupuestos').map((record) => mapQuote(record, authIds)))
+  await rest(config, 'quotes', quoteRows.map((record) => mapQuote(record, authIds)))
 
   const expectedProfileIds = new Set(ownerProfileIds)
   for (const userId of authIds.values()) expectedProfileIds.add(userId)

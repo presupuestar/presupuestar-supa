@@ -2,6 +2,7 @@ import { ClientResponseError } from 'pocketbase'
 
 /** Traduce un error de PocketBase a un mensaje que explique qué revisar. */
 export function mensajeError(e: unknown, generico = 'No se pudo completar la operación.'): string {
+  if (e instanceof Error && !(e instanceof ClientResponseError)) return e.message || generico
   if (!(e instanceof ClientResponseError)) return generico
   const s = e.status
   if (s === 0 || s >= 500)

@@ -9,3 +9,6 @@ enable_signup = false
 enable_signup = false
 double_confirm_changes = true
 enable_confirmations = true
+
+[functions.manage-team]
+verify_jwt = true

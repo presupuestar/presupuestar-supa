@@ -6,12 +6,13 @@ import { Catalogo } from './pages/Catalogo'
 import { NuevoPresupuesto } from './pages/NuevoPresupuesto'
 import { Historial } from './pages/Historial'
 import { Equipo } from './pages/Equipo'
-import { Propietario } from './pages/Propietario'
+import { PropietarioSupabase } from './pages/PropietarioSupabase'
 
 function Protegida({ children }: { children: React.ReactNode }) {
   const { usuario, cargando, salir } = useSesion()
   if (cargando) return null
   if (!usuario) return <Navigate to="/login" replace />
+  if (usuario.rol === 'propietario') return <Navigate to="/propietario" replace />
   if (!usuario.empresa) {
     return (
       <main className="contenido">
@@ -36,8 +37,8 @@ export default function App() {
           <Route path="/presupuestos/:id/editar" element={<Protegida><NuevoPresupuesto /></Protegida>} />
           <Route path="/historial" element={<Protegida><Historial /></Protegida>} />
           <Route path="/equipo" element={<Protegida><Equipo /></Protegida>} />
-          <Route path="/propietario" element={<Propietario />} />
-          <Route path="/propietario/empresas/:id" element={<Propietario />} />
+          <Route path="/propietario" element={<PropietarioSupabase />} />
+          <Route path="/propietario/empresas/:id" element={<PropietarioSupabase />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

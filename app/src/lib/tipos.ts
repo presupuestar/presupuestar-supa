@@ -16,8 +16,8 @@ export interface Empresa {
   validezDias?: number
   condiciones?: string
   mostrarSello?: boolean
-  collectionId: string
-  collectionName: string
+  created?: string
+  updated?: string
 }
 
 export interface Item {

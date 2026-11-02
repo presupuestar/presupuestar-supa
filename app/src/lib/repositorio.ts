@@ -1,39 +1,168 @@
-/**
- * Única puerta de entrada a los datos. Las pantallas no hablan con PocketBase
- * directamente: si mañana cambia el backend, solo se reescribe este archivo.
- */
-import { pb } from './pb'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from './supabase'
 import { normalizarMoneda } from './formato'
 import type { Cliente, Empresa, Estado, Item, Linea, Presupuesto, ResumenMes, ResumenVendedor, UsuarioEquipo } from './tipos'
 
-/** Empresa del usuario con sesión iniciada: todo lo que se crea queda dentro de ella. */
-const empresaId = (): string => {
-  const id = pb.authStore.record?.empresa as string | undefined
-  if (!id) throw new Error('Este usuario no tiene una empresa asignada.')
+type DbRow = Record<string, unknown>
+
+const errorResult = <T>(result: { data: T | null; error: { message: string } | null }): T => {
+  if (result.error) throw new Error(result.error.message)
+  if (result.data === null) throw new Error('Supabase no devolvió el registro esperado.')
+  return result.data
+}
+
+const empresaId = async (): Promise<string> => {
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const result = await supabase.from('profiles').select('company_id').eq('user_id', userData.user.id).single()
+  const id = errorResult(result).company_id
+  if (typeof id !== 'string' || !id) throw new Error('Este usuario no tiene una empresa asignada.')
   return id
 }
 
-const dinero = (n: number) => Math.round(n * 100) / 100
+const empresaDesdeDb = (r: DbRow): Empresa => ({
+  id: String(r.id),
+  nombre: String(r.name),
+  documento: String(r.document ?? ''),
+  email: String(r.email ?? ''),
+  telefono: String(r.phone ?? ''),
+  logo: String(r.logo_path ?? ''),
+  fuenteTitulosArchivo: String(r.title_font_path ?? ''),
+  fuenteTextoArchivo: String(r.text_font_path ?? ''),
+  colorPrimario: String(r.primary_color),
+  colorAcento: String(r.accent_color),
+  fuenteTitulos: String(r.title_font ?? ''),
+  fuenteTexto: String(r.text_font ?? ''),
+  validezDias: Number(r.validity_days) || undefined,
+  condiciones: String(r.terms ?? ''),
+  mostrarSello: Boolean(r.show_seal),
+  created: String(r.created_at ?? ''),
+  updated: String(r.updated_at ?? ''),
+})
 
-const escaparFiltro = (valor: string) => valor.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+const itemDesdeDb = (r: DbRow): Item => ({
+  id: String(r.id),
+  empresa: String(r.company_id),
+  nombre: String(r.name),
+  descripcion: String(r.description ?? ''),
+  proveedor: String(r.supplier ?? ''),
+  unidad: String(r.unit ?? ''),
+  precio: Number(r.price),
+  moneda: String(r.currency ?? 'ARS'),
+  activo: Boolean(r.active),
+})
+
+const clienteDesdeDb = (r: DbRow): Cliente => ({
+  id: String(r.id),
+  empresa: String(r.company_id),
+  nombre: String(r.name),
+  email: String(r.email),
+  telefono: String(r.phone),
+  documento: String(r.document ?? ''),
+  direccion: String(r.address ?? ''),
+})
+
+const presupuestoDesdeDb = (r: DbRow): Presupuesto => ({
+  id: String(r.id),
+  empresa: String(r.company_id),
+  numero: Number(r.number),
+  estado: r.status as Estado,
+  fechaEmision: String(r.issue_date ?? ''),
+  validezDias: Number(r.validity_days) || undefined,
+  plazo: String(r.delivery_time ?? ''),
+  formaPago: String(r.payment_terms ?? ''),
+  notas: String(r.notes ?? ''),
+  ganancia: Number(r.profit) || 0,
+  cliente: String(r.client_id ?? ''),
+  clienteDatos: r.client_snapshot as Presupuesto['clienteDatos'],
+  lineas: r.lines as Linea[],
+  vendedor: String(r.seller_id ?? ''),
+  vendedorNombre: String(r.seller_name ?? ''),
+  vendedorEmail: String(r.seller_email ?? ''),
+  total: Number(r.total),
+  moneda: String(r.currency ?? 'ARS'),
+  cotizacionDolar: Number(r.exchange_rate) || 0,
+  cotizacionFecha: String(r.exchange_rate_date ?? ''),
+  fechaRespuesta: String(r.answered_at ?? ''),
+  created: String(r.created_at ?? ''),
+  updated: String(r.updated_at ?? ''),
+})
+
+const itemAColumna = (d: Partial<Item>) => ({
+  ...(d.nombre !== undefined ? { name: d.nombre } : {}),
+  ...(d.descripcion !== undefined ? { description: d.descripcion } : {}),
+  ...(d.proveedor !== undefined ? { supplier: d.proveedor } : {}),
+  ...(d.unidad !== undefined ? { unit: d.unidad } : {}),
+  ...(d.precio !== undefined ? { price: d.precio } : {}),
+  ...(d.moneda !== undefined ? { currency: d.moneda } : {}),
+  ...(d.activo !== undefined ? { active: d.activo } : {}),
+})
+
+const clienteAColumna = (d: Partial<Cliente>) => ({
+  ...(d.nombre !== undefined ? { name: d.nombre } : {}),
+  ...(d.email !== undefined ? { email: d.email } : {}),
+  ...(d.telefono !== undefined ? { phone: d.telefono } : {}),
+  ...(d.documento !== undefined ? { document: d.documento } : {}),
+  ...(d.direccion !== undefined ? { address: d.direccion } : {}),
+})
+
+const presupuestoAColumna = (d: Partial<Presupuesto>) => ({
+  ...(d.estado !== undefined ? { status: d.estado } : {}),
+  ...(d.fechaEmision !== undefined ? { issue_date: d.fechaEmision || null } : {}),
+  ...(d.validezDias !== undefined ? { validity_days: d.validezDias || null } : {}),
+  ...(d.plazo !== undefined ? { delivery_time: d.plazo } : {}),
+  ...(d.formaPago !== undefined ? { payment_terms: d.formaPago } : {}),
+  ...(d.notas !== undefined ? { notes: d.notas } : {}),
+  ...(d.cliente !== undefined ? { client_id: d.cliente || null } : {}),
+  ...(d.clienteDatos !== undefined ? { client_snapshot: d.clienteDatos } : {}),
+  ...(d.lineas !== undefined ? { lines: d.lineas } : {}),
+  ...(d.ganancia !== undefined ? { profit: d.ganancia } : {}),
+  ...(d.moneda !== undefined ? { currency: d.moneda } : {}),
+  ...(d.cotizacionDolar !== undefined ? { exchange_rate: d.cotizacionDolar } : {}),
+  ...(d.cotizacionFecha !== undefined ? { exchange_rate_date: d.cotizacionFecha } : {}),
+})
+
+const dinero = (n: number) => Math.round(n * 100) / 100
+const escaparLike = (value: string) => value.replace(/[\\%_,]/g, '\\$&').replace(/"/g, '\\"')
 
 export const totalLineas = (lineas: Linea[]) =>
-  dinero(lineas.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0))
+  dinero(lineas.reduce((suma, linea) => suma + linea.cantidad * linea.precioUnitario, 0))
 
 export const repositorio = {
   empresa: {
-    obtener: (): Promise<Empresa> => pb.collection<Empresa>('empresa').getOne(empresaId()),
-    archivoUrl(e: Empresa, archivo?: string) {
-      return archivo ? pb.files.getURL(e, archivo) : undefined
+    async obtener(): Promise<Empresa> {
+      const id = await empresaId()
+      return empresaDesdeDb(errorResult(await supabase.from('companies').select('*').eq('id', id).single()))
     },
-    actualizar: (id: string, datos: FormData | Partial<Empresa>) =>
-      pb.collection<Empresa>('empresa').update(id, datos),
+    archivoUrl(_empresa: Empresa, archivo?: string) {
+      if (!archivo) return undefined
+      return supabase.storage.from('company-assets').getPublicUrl(archivo).data.publicUrl
+    },
+    async actualizar(id: string, datos: Partial<Empresa>) {
+      const { error } = await supabase.from('companies').update({
+        ...(datos.nombre !== undefined ? { name: datos.nombre } : {}),
+        ...(datos.documento !== undefined ? { document: datos.documento } : {}),
+        ...(datos.email !== undefined ? { email: datos.email } : {}),
+        ...(datos.telefono !== undefined ? { phone: datos.telefono } : {}),
+        ...(datos.colorPrimario !== undefined ? { primary_color: datos.colorPrimario } : {}),
+        ...(datos.colorAcento !== undefined ? { accent_color: datos.colorAcento } : {}),
+        ...(datos.fuenteTitulos !== undefined ? { title_font: datos.fuenteTitulos } : {}),
+        ...(datos.fuenteTexto !== undefined ? { text_font: datos.fuenteTexto } : {}),
+        ...(datos.validezDias !== undefined ? { validity_days: datos.validezDias } : {}),
+        ...(datos.condiciones !== undefined ? { terms: datos.condiciones } : {}),
+        ...(datos.mostrarSello !== undefined ? { show_seal: datos.mostrarSello } : {}),
+      }).eq('id', id)
+      if (error) throw error
+    },
   },
 
   items: {
-    listar: (soloActivos = true) =>
-      pb.collection<Item>('items').getFullList({ sort: 'nombre', filter: soloActivos ? 'activo = true' : '' }),
-    listarPagina: async ({
+    async listar(soloActivos = true) {
+      let query = supabase.from('items').select('*').order('name')
+      if (soloActivos) query = query.eq('active', true)
+      return errorResult(await query).map(itemDesdeDb)
+    },
+    async listarPagina({
       pagina, porPagina, soloActivos, busqueda, proveedor, sinProveedor,
     }: {
       pagina: number
@@ -42,81 +171,156 @@ export const repositorio = {
       busqueda?: string
       proveedor?: string
       sinProveedor?: boolean
-    }) => {
-      const filtros = soloActivos ? ['activo = true'] : []
-      const consulta = busqueda?.trim()
-      if (consulta) {
-        const valor = escaparFiltro(consulta)
-        filtros.push(`(nombre ~ "${valor}" || descripcion ~ "${valor}" || proveedor ~ "${valor}")`)
+    }) {
+      let query = supabase.from('items').select('*', { count: 'exact' }).order('name')
+      if (soloActivos) query = query.eq('active', true)
+      const termino = busqueda?.trim()
+      if (termino) {
+        const like = `"%${escaparLike(termino)}%"`
+        query = query.or(`name.ilike.${like},description.ilike.${like},supplier.ilike.${like}`)
       }
-      if (sinProveedor) filtros.push('proveedor = ""')
-      else if (proveedor?.trim()) filtros.push(`proveedor ~ "${escaparFiltro(proveedor.trim())}"`)
-      const resultado = await pb.collection<Item>('items').getList(pagina, porPagina, {
-        sort: 'nombre',
-        filter: filtros.join(' && '),
-      })
-      return {
-        items: resultado.items,
-        totalItems: resultado.totalItems,
-        totalPages: resultado.totalPages,
-      }
+      if (sinProveedor) query = query.eq('supplier', '')
+      else if (proveedor?.trim()) query = query.ilike('supplier', `%${escaparLike(proveedor.trim())}%`)
+      const from = (pagina - 1) * porPagina
+      const { data, count, error } = await query.range(from, from + porPagina - 1)
+      if (error) throw error
+      const totalItems = count ?? 0
+      return { items: (data ?? []).map(itemDesdeDb), totalItems, totalPages: Math.ceil(totalItems / porPagina) }
     },
-    buscarPorNombresYProveedor: async (nombres: string[], proveedor: string) => {
+    async buscarPorNombresYProveedor(nombres: string[], proveedor: string) {
       const encontrados = new Map<string, Item>()
-      const nombresUnicos = [...new Set(nombres.map((nombre) => nombre.trim()).filter(Boolean))]
-      for (let inicio = 0; inicio < nombresUnicos.length; inicio += 15) {
-        const filtrosNombre = nombresUnicos.slice(inicio, inicio + 15)
-          .map((nombre) => `nombre ~ "${escaparFiltro(nombre)}"`)
-          .join(' || ')
-        let pagina = 1
-        let totalPaginas = 1
-        while (pagina <= totalPaginas) {
-          const resultado = await pb.collection<Item>('items').getList(pagina, 30, {
-            sort: 'nombre',
-            filter: `proveedor ~ "${escaparFiltro(proveedor)}" && (${filtrosNombre})`,
-          })
-          for (const item of resultado.items) encontrados.set(item.id, item)
-          totalPaginas = resultado.totalPages
-          pagina++
+      const nombresUnicos = [...new Set(nombres.map((name) => name.trim()).filter(Boolean))]
+      for (let start = 0; start < nombresUnicos.length; start += 15) {
+        for (const name of nombresUnicos.slice(start, start + 15)) {
+          const result = await supabase.from('items').select('*')
+            .ilike('supplier', `%${escaparLike(proveedor)}%`)
+            .ilike('name', `%${escaparLike(name)}%`)
+            .order('name')
+          for (const row of errorResult(result)) {
+            const item = itemDesdeDb(row)
+            encontrados.set(item.id, item)
+          }
         }
       }
       return [...encontrados.values()]
     },
-    contar: async (soloActivos = true) => {
-      const resultado = await pb.collection<Item>('items').getList(1, 1, {
-        filter: soloActivos ? 'activo = true' : '',
-      })
-      return resultado.totalItems
+    async contar(soloActivos = true) {
+      let query = supabase.from('items').select('id', { count: 'exact', head: true })
+      if (soloActivos) query = query.eq('active', true)
+      const { count, error } = await query
+      if (error) throw error
+      return count ?? 0
     },
-    crear: (d: Omit<Item, 'id' | 'empresa'>) => pb.collection<Item>('items').create({ ...d, empresa: empresaId() }),
-    actualizar: (id: string, d: Partial<Item>) => pb.collection<Item>('items').update(id, d),
-    eliminar: (id: string) => pb.collection('items').delete(id),
+    async crear(d: Omit<Item, 'id' | 'empresa'>) {
+      const id = await empresaId()
+      return itemDesdeDb(errorResult(await supabase.from('items')
+        .insert({ ...itemAColumna(d), company_id: id }).select('*').single()))
+    },
+    async actualizar(id: string, d: Partial<Item>) {
+      return itemDesdeDb(errorResult(await supabase.from('items').update(itemAColumna(d)).eq('id', id).select('*').single()))
+    },
+    async eliminar(id: string) {
+      const { error } = await supabase.from('items').delete().eq('id', id)
+      if (error) throw error
+    },
   },
 
-  /** Equipo de la empresa: el administrador crea empleados (rol "miembro") y gestiona sus accesos. */
   usuarios: {
-    listar: () => pb.collection<UsuarioEquipo>('users').getFullList({ sort: 'created' }),
-    crear: (d: { email: string; password: string; name: string }) =>
-      pb.collection<UsuarioEquipo>('users').create({ ...d, passwordConfirm: d.password, empresa: empresaId(), rol: 'miembro', emailVisibility: true }),
-    eliminar: (id: string) => pb.collection('users').delete(id),
-    restablecerClave: (id: string, password: string) => pb.send(`/api/equipo/${id}/clave`, { method: 'POST', body: { password } }),
+    async listar(): Promise<UsuarioEquipo[]> {
+      const rows = errorResult(await supabase.from('profiles')
+        .select('user_id,company_id,role,name,first_access_password_answered,created_at,email')
+        .order('created_at'))
+      return rows.map((r) => ({
+        id: String(r.user_id),
+        email: String(r.email ?? ''),
+        name: String(r.name ?? ''),
+        rol: r.role === 'admin' ? 'admin' : 'miembro',
+        primerAccesoClaveRespondido: Boolean(r.first_access_password_answered),
+        empresa: String(r.company_id ?? ''),
+        created: String(r.created_at ?? ''),
+      }))
+    },
+    async crear(datos: { email: string; password: string; name: string }) {
+      const { error } = await supabase.functions.invoke('manage-team', {
+        body: { action: 'create', ...datos },
+      })
+      if (error) throw error
+    },
+    async eliminar(id: string) {
+      const { error } = await supabase.functions.invoke('manage-team', { body: { action: 'delete', userId: id } })
+      if (error) throw error
+    },
+    async restablecerClave(id: string, password: string) {
+      const { error } = await supabase.functions.invoke('manage-team', {
+        body: { action: 'reset-password', userId: id, password },
+      })
+      if (error) throw error
+    },
   },
 
   clientes: {
-    listar: () => pb.collection<Cliente>('clientes').getFullList({ sort: 'nombre' }),
-    crear: (d: Omit<Cliente, 'id' | 'empresa'>) => pb.collection<Cliente>('clientes').create({ ...d, empresa: empresaId() }),
-    actualizar: (id: string, d: Partial<Cliente>) => pb.collection<Cliente>('clientes').update(id, d),
+    async listar() {
+      return errorResult(await supabase.from('clients').select('*').order('name')).map(clienteDesdeDb)
+    },
+    async crear(d: Omit<Cliente, 'id' | 'empresa'>) {
+      const id = await empresaId()
+      return clienteDesdeDb(errorResult(await supabase.from('clients')
+        .insert({ ...clienteAColumna(d), company_id: id }).select('*').single()))
+    },
+    async actualizar(id: string, d: Partial<Cliente>) {
+      return clienteDesdeDb(errorResult(await supabase.from('clients')
+        .update(clienteAColumna(d)).eq('id', id).select('*').single()))
+    },
   },
 
   presupuestos: {
-    listar: () => pb.collection<Presupuesto>('presupuestos').getFullList({ sort: '-numero' }),
-    obtener: (id: string) => pb.collection<Presupuesto>('presupuestos').getOne(id),
-    // El número y el total los asigna el servidor (hook de PocketBase).
-    crear: (d: Partial<Presupuesto>) => pb.collection<Presupuesto>('presupuestos').create({ ...d, empresa: empresaId() }),
-    actualizar: (id: string, d: Partial<Presupuesto>) => pb.collection<Presupuesto>('presupuestos').update(id, d),
-    cambiarEstado: (id: string, estado: Estado) =>
-      pb.collection<Presupuesto>('presupuestos').update(id, { estado }),
-    eliminar: (id: string) => pb.collection('presupuestos').delete(id),
+    async listar() {
+      return errorResult(await supabase.from('quotes').select('*').order('number', { ascending: false })).map(presupuestoDesdeDb)
+    },
+    async obtener(id: string) {
+      return presupuestoDesdeDb(errorResult(await supabase.from('quotes').select('*').eq('id', id).single()))
+    },
+    async crear(d: Partial<Presupuesto>) {
+      const companyId = await empresaId()
+      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
+        .insert({ ...presupuestoAColumna(d), company_id: companyId, status: d.estado ?? 'borrador' })
+        .select('*').single()))
+    },
+    async actualizar(id: string, d: Partial<Presupuesto>) {
+      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
+        .update(presupuestoAColumna(d)).eq('id', id).select('*').single()))
+    },
+    async cambiarEstado(id: string, estado: Estado) {
+      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
+        .update({ status: estado }).eq('id', id).select('*').single()))
+    },
+    async eliminar(id: string) {
+      const { error } = await supabase.from('quotes').delete().eq('id', id)
+      if (error) throw error
+    },
+  },
+
+  async perfil(user: User): Promise<{
+    id: string
+    email: string
+    name: string
+    empresa: string
+    rol: 'admin' | 'miembro' | 'propietario'
+    primerAccesoClaveRespondido: boolean
+  }> {
+    const result = await supabase.from('profiles')
+      .select('company_id,role,name,first_access_password_answered')
+      .eq('user_id', user.id).single()
+    const profile = errorResult(result)
+    const owner = errorResult(await supabase.rpc('is_platform_owner'))
+    return {
+      id: user.id,
+      email: user.email ?? '',
+      name: String(profile.name ?? ''),
+      empresa: profile.company_id ? String(profile.company_id) : '',
+      rol: owner ? 'propietario' : profile.role === 'admin' ? 'admin' : 'miembro',
+      primerAccesoClaveRespondido: Boolean(profile.first_access_password_answered),
+    }
   },
 
   /** Ventas por persona del equipo (sin borradores), de mayor a menor monto vendido (aceptado). */
@@ -141,11 +345,9 @@ export const repositorio = {
     }
     return [...personas.values()]
       .map((v) => ({ ...v, conversionPct: Math.round((1000 * v.aceptados) / v.cantidad) / 10 }))
-      // las personas ordenadas por lo vendido; los presupuestos sin vendedor asignado (anteriores a esta función) van al final
       .sort((a, b) => Number(a.clave === '') - Number(b.clave === '') || b.vendido - a.vendido || b.presupuestado - a.presupuestado)
   },
 
-  /** Resumen por mes de emisión. Conversión = aceptados / enviados (sin borradores). */
   resumenMensual(presupuestos: Presupuesto[]): ResumenMes[] {
     const meses = new Map<string, ResumenMes & { aceptados: number }>()
     for (const p of presupuestos) {

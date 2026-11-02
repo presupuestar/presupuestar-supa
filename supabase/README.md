@@ -39,4 +39,11 @@ La migración de esquema está en `migrations/20261102100000_initial_schema.sql`
 2. Solo si los conteos de destino y origen son correctos, confirmá la transferencia: `npm run migrate:supabase -- --apply`.
 3. Las cuentas migradas reciben contraseñas temporales aleatorias; se guardan en un CSV local dentro de `Documents`. Entregalas de forma privada y pedí a cada usuario que cambie su contraseña. No se pueden reutilizar los hashes de PocketBase.
 
+Antes de usar la app nueva, aplica también `migrations/20261102110000_profile_emails.sql` desde SQL Editor y despliega las funciones administrativas:
+
+```powershell
+npx supabase functions deploy manage-team --project-ref TU_PROJECT_REF
+npx supabase functions deploy manage-platform --project-ref TU_PROJECT_REF
+```
+
 El importador conserva los datos y archivos originales de PocketBase, verifica que el destino esté vacío antes de empezar y guarda el estado local para poder reanudar una ejecución interrumpida de forma segura.

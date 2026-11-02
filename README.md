@@ -1,13 +1,16 @@
 # PresupuestAR
 
 Sistema de presupuestos: la empresa carga su catálogo una vez y arma cada presupuesto con los datos del cliente.
-Backend con **PocketBase** (un solo ejecutable, sin cuentas ni nube) y app en **React + Vite + TypeScript**.
+App en **React + Vite + TypeScript**. PocketBase se conserva como copia de seguridad y origen de datos; la app está pasando a **Supabase**.
 
 ```
 presupuestar/
-├── pb/    PocketBase: migraciones (colecciones y datos de ejemplo) y hooks (numeración y totales)
-└── app/   App React: login, tema por empresa, capa de datos
+├── pb/       PocketBase: origen local y respaldo; no borrar durante la transición
+├── supabase/ Esquema, funciones y pasos para Supabase
+└── app/      App React: login, tema por empresa, presupuestos y catálogo
 ```
+
+> **Estado de migración:** los datos ya se importaron a Supabase. Antes de usar la app nueva, aplica las migraciones pendientes de `supabase/migrations/` y despliega las funciones documentadas en [supabase/README.md](./supabase/README.md). Mantén `pb/pb_data` respaldado hasta validar el inicio de sesión y las operaciones en Supabase.
 
 ## Primera vez
 

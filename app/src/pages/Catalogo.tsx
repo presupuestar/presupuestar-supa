@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ClientResponseError } from 'pocketbase'
 import { Layout } from '../components/Layout'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseImporte } from '../lib/formato'
@@ -17,7 +16,6 @@ const claveFilaPdf = (nombre: string, precio: number, moneda: string) =>
   `${normalizarClave(nombre)}|${precio}|${normalizarMoneda(moneda)}`
 
 function mensajeErrorImportacion(e: unknown): string {
-  if (e instanceof ClientResponseError) return mensajeError(e, 'No se pudo sincronizar el ítem.')
   if (e instanceof Error) return e.message
   return mensajeError(e, 'No se pudo sincronizar el ítem.')
 }

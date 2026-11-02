@@ -1,15 +1,25 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { RecordModel } from 'pocketbase'
-import { pb } from '../lib/pb'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { repositorio } from '../lib/repositorio'
 import { aplicarTema, restablecerTema } from '../lib/tema'
 import type { Empresa } from '../lib/tipos'
 
+export interface UsuarioSesion {
+  id: string
+  email: string
+  name: string
+  empresa: string
+  rol: 'admin' | 'miembro' | 'propietario'
+  primerAccesoClaveRespondido: boolean
+}
+
 interface Valor {
-  usuario: RecordModel | null
+  usuario: UsuarioSesion | null
   empresa: Empresa | null
   cargando: boolean
   necesitaClaveActual: boolean
+  errorEmpresa: string
   entrar: (email: string, clave: string) => Promise<void>
   resolverPrimerAcceso: (clave?: string, claveActual?: string) => Promise<void>
   salir: () => void
@@ -17,55 +27,117 @@ interface Valor {
 
 const Ctx = createContext<Valor | null>(null)
 export const useSesion = () => {
-  const v = useContext(Ctx)
-  if (!v) throw new Error('useSesion debe usarse dentro de <SesionProvider>')
-  return v
+  const value = useContext(Ctx)
+  if (!value) throw new Error('useSesion debe usarse dentro de <SesionProvider>')
+  return value
 }
 
+const perfilDeUsuario = async (user: User) => repositorio.perfil(user)
+
 export function SesionProvider({ children }: { children: ReactNode }) {
-  const [usuario, setUsuario] = useState<RecordModel | null>(pb.authStore.record)
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(null)
   const [empresa, setEmpresa] = useState<Empresa | null>(null)
   const [cargando, setCargando] = useState(true)
-  const [claveActual, setClaveActual] = useState('')
-
-  useEffect(() => pb.authStore.onChange((_t, rec) => setUsuario(rec)), [])
+  const [errorEmpresa, setErrorEmpresa] = useState('')
 
   useEffect(() => {
-    // Una sesión guardada en el navegador puede ser inválida (base reiniciada, usuario borrado, token vencido):
-    // se valida contra el servidor y, si no sirve, se descarta para volver al login.
-    const sesion = pb.authStore.isValid
-      ? pb.collection('users').authRefresh().then(() => undefined).catch(() => pb.authStore.clear())
-      : Promise.resolve(pb.authStore.clear())
-    sesion.finally(() => setCargando(false))
+    let vigente = true
+    const cargar = async (user: User | null) => {
+      if (!user) {
+        if (vigente) {
+          setUsuario(null)
+          setEmpresa(null)
+          setErrorEmpresa('')
+          restablecerTema()
+        }
+        return
+      }
+      try {
+        const perfil = await perfilDeUsuario(user)
+        if (vigente) setUsuario(perfil)
+      } catch (error) {
+        await supabase.auth.signOut()
+        if (vigente) setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo cargar el perfil.')
+      } finally {
+        if (vigente) setCargando(false)
+      }
+    }
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) throw error
+      return cargar(data.session?.user ?? null)
+    }).catch((error: unknown) => {
+      if (vigente) {
+        setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo validar la sesión.')
+        setCargando(false)
+      }
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      queueMicrotask(() => { void cargar(session?.user ?? null) })
+    })
+    return () => {
+      vigente = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
-  // Cada empresa tiene su marca (logo, colores y tipografías): se carga con el usuario que ingresó.
-  const empresaDelUsuario = (usuario?.empresa as string | undefined) ?? ''
   useEffect(() => {
-    if (!empresaDelUsuario) { setEmpresa(null); restablecerTema(); return }
+    if (!usuario?.empresa) {
+      setEmpresa(null)
+      setErrorEmpresa('')
+      restablecerTema()
+      return
+    }
     let vigente = true
     repositorio.empresa.obtener()
-      .then((e) => { if (vigente) { setEmpresa(e); aplicarTema(e) } })
-      .catch(() => {})
+      .then((value) => {
+        if (vigente) {
+          setEmpresa(value)
+          setErrorEmpresa('')
+          aplicarTema(value)
+        }
+      })
+      .catch((error: unknown) => {
+        if (vigente) setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo cargar la empresa.')
+      })
     return () => { vigente = false }
-  }, [usuario?.id, empresaDelUsuario])
+  }, [usuario?.id, usuario?.empresa])
 
-  const entrar = async (email: string, clave: string) => {
-    const autenticacion = await pb.collection('users').authWithPassword(email, clave)
-    setClaveActual(autenticacion.record.primerAccesoClaveRespondido === true ? '' : clave)
+  const entrar = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    if (!data.user) throw new Error('Supabase no devolvió el usuario autenticado.')
+    setUsuario(await perfilDeUsuario(data.user))
   }
-  const resolverPrimerAcceso = async (clave?: string, claveActualIngresada?: string) => {
+
+  const resolverPrimerAcceso = async (password?: string) => {
     if (!usuario) return
-    const actual = claveActual || claveActualIngresada
-    if (clave && !actual) throw new Error('Ingresá tu contraseña actual para poder cambiarla.')
-    const actualizado = await pb.collection('users').update(usuario.id, {
-      primerAccesoClaveRespondido: true,
-      ...(clave ? { oldPassword: actual, password: clave, passwordConfirm: clave } : {}),
-    })
-    setUsuario(actualizado)
-    setClaveActual('')
+    if (password) {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
+    }
+    const { error } = await supabase.from('profiles')
+      .update({ first_access_password_answered: true })
+      .eq('user_id', usuario.id)
+    if (error) throw error
+    setUsuario({ ...usuario, primerAccesoClaveRespondido: true })
   }
-  const salir = () => { setClaveActual(''); pb.authStore.clear() }
 
-  return <Ctx.Provider value={{ usuario, empresa, cargando, necesitaClaveActual: !claveActual, entrar, resolverPrimerAcceso, salir }}>{children}</Ctx.Provider>
+  const salir = () => { void supabase.auth.signOut() }
+
+  return (
+    <Ctx.Provider value={{
+      usuario,
+      empresa,
+      cargando,
+      necesitaClaveActual: false,
+      errorEmpresa,
+      entrar,
+      resolverPrimerAcceso,
+      salir,
+    }}>
+      {children}
+    </Ctx.Provider>
+  )
 }
