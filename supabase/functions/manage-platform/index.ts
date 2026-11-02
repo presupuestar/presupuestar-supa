@@ -133,32 +133,48 @@ Deno.serve(async (request: Request) => {
       .select('id').eq('id', companyId).maybeSingle()
     if (companyError || !company) return json({ error: 'No se encontró la empresa.' }, 404)
     const { data: members, error: membersError } = await adminClient.from('profiles')
-      .select('user_id').eq('company_id', companyId)
+      .select('user_id,email').eq('company_id', companyId)
     if (membersError) return json({ error: membersError.message }, 400)
     const bucket = adminClient.storage.from('company-assets')
-    const { data: folders, error: foldersError } = await bucket.list(companyId, { limit: 1000 })
-    if (foldersError) return json({ error: `No se pudieron revisar los archivos de la empresa: ${foldersError.message}` }, 400)
     const paths: string[] = []
-    for (const folder of folders) {
-      if (folder.id) {
-        paths.push(`${companyId}/${folder.name}`)
-        continue
+    const collectFiles = async (directory: string): Promise<void> => {
+      const pageSize = 100
+      let offset = 0
+      while (true) {
+        const { data: entries, error } = await bucket.list(directory, { limit: pageSize, offset })
+        if (error) throw new Error(`No se pudieron revisar los archivos de ${directory}: ${error.message}`)
+        for (const entry of entries) {
+          const path = `${directory}/${entry.name}`
+          if (entry.id) paths.push(path)
+          else await collectFiles(path)
+        }
+        if (entries.length < pageSize) return
+        offset += entries.length
       }
-      const { data: files, error: filesError } = await bucket.list(`${companyId}/${folder.name}`, { limit: 1000 })
-      if (filesError) return json({ error: `No se pudieron revisar los archivos de la empresa: ${filesError.message}` }, 400)
-      paths.push(...files.map((file) => `${companyId}/${folder.name}/${file.name}`))
     }
-    if (paths.length) {
-      const { error } = await bucket.remove(paths)
+    try {
+      await collectFiles(companyId)
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : 'No se pudieron revisar los archivos de la empresa.' }, 400)
+    }
+    for (let offset = 0; offset < paths.length; offset += 100) {
+      const { error } = await bucket.remove(paths.slice(offset, offset + 100))
       if (error) return json({ error: `No se pudieron eliminar los archivos de la empresa: ${error.message}` }, 400)
     }
+    // Remove company quotes first: their seller_id FK would otherwise update quotes
+    // while Auth deletes a user, invoking prepare_quote during the cascade.
+    const { error: quotesDeleteError } = await adminClient.from('quotes').delete().eq('company_id', companyId)
+    if (quotesDeleteError) return json({ error: `No se pudieron eliminar los presupuestos de la empresa: ${quotesDeleteError.message}` }, 400)
+
     for (const member of members) {
       const { data: owner, error: ownerLookupError } = await adminClient.from('platform_owners')
         .select('user_id').eq('user_id', member.user_id).maybeSingle()
       if (ownerLookupError) return json({ error: `No se pudo verificar el tipo de cuenta ${member.user_id}: ${ownerLookupError.message}` }, 400)
       if (!owner) {
         const { error } = await adminClient.auth.admin.deleteUser(member.user_id)
-        if (error) return json({ error: `No se pudo eliminar un usuario de la empresa: ${error.message}` }, 400)
+        if (error) return json({
+          error: `No se pudo eliminar la cuenta ${member.email || member.user_id}: ${error.message}`,
+        }, 400)
       }
     }
 
