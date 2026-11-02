@@ -222,7 +222,9 @@ dialog::backdrop{background:rgba(16,24,40,.5)}
 .ajuste-linea label{display:flex;align-items:center;gap:6px;color:var(--muted)}
 .ajuste-linea input,.ajuste-general input{width:72px;padding:6px 8px;font-size:13px}
 .ajuste-linea button{font-size:12px}
-.ajuste-general{min-width:205px}
+.ajuste-general{display:flex;align-items:center;gap:8px;min-width:0;padding:4px;border:1px solid var(--linea);border-radius:10px;background:#fff}
+.ajuste-general input{width:76px;padding:8px 9px;border:1px solid var(--linea);border-radius:7px;font:400 14px var(--fuente-texto)}
+.ajuste-general .btn{white-space:nowrap}
 .linea .link:disabled{opacity:.45;cursor:not-allowed;text-decoration:none}
 .pill.pers{background:#E8F1FE;color:#1450A8;font-size:11px;padding:2px 10px}
 .sub-total{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;padding-top:9px;white-space:nowrap}
@@ -493,6 +495,7 @@ a.link{color:var(--primario)}
   .agregar{align-items:stretch;gap:10px}
   .chico-campo{flex:1 1 100%;min-width:0;max-width:none}
   .ajuste-general{min-width:0;width:100%}
+  .ajuste-general .btn{flex:1}
   .agregar>.btn{flex:1 1 100%;width:100%}
   .aviso,.aviso-cotizacion{min-width:0;overflow-wrap:anywhere}
   .aviso{padding:16px}

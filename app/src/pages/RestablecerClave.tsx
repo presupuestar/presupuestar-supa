@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Isotipo } from '../components/Isotipo'
-import { supabase } from '../lib/supabase'
+import { supabase, supabasePropietario } from '../lib/supabase'
 
 export function RestablecerClave() {
   const navigate = useNavigate()
+  const propietario = new URLSearchParams(window.location.search).get('owner') === '1'
+  const auth = propietario ? supabasePropietario : supabase
   const [listo, setListo] = useState(false)
   const [clave, setClave] = useState('')
   const [confirmacion, setConfirmacion] = useState('')
@@ -13,25 +15,42 @@ export function RestablecerClave() {
 
   useEffect(() => {
     let vigente = true
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = auth.auth.onAuthStateChange((event, session) => {
       if (vigente && event === 'PASSWORD_RECOVERY' && session) setListo(true)
     })
-    const recoveryLink = new URLSearchParams(window.location.search).has('code')
-      || new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery'
-    if (recoveryLink) {
-      supabase.auth.getSession().then(({ data, error: sessionError }) => {
-        if (!vigente) return
-        if (sessionError) setError(sessionError.message)
-        else if (data.session) setListo(true)
-      }).catch((reason: unknown) => {
-        if (vigente) setError(reason instanceof Error ? reason.message : 'El enlace no es válido.')
-      })
+    const parametros = new URLSearchParams(window.location.search)
+    const code = parametros.get('code')
+    const fragmento = new URLSearchParams(window.location.hash.slice(1))
+    const tipoRecuperacion = fragmento.get('type') === 'recovery'
+    const recoveryLink = Boolean(code) || tipoRecuperacion
+    const cargarSesionRecuperacion = async () => {
+      if (!recoveryLink) return
+      if (code) {
+        const { data, error: exchangeError } = await auth.auth.exchangeCodeForSession(code)
+        if (exchangeError) throw exchangeError
+        if (vigente && data.session) setListo(true)
+        return
+      }
+      const accessToken = fragmento.get('access_token')
+      const refreshToken = fragmento.get('refresh_token')
+      if (tipoRecuperacion && accessToken && refreshToken) {
+        const { data, error: sessionError } = await auth.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        if (sessionError) throw sessionError
+        if (vigente && data.session) setListo(true)
+        return
+      }
+      const { data, error: sessionError } = await auth.auth.getSession()
+      if (sessionError) throw sessionError
+      if (vigente && data.session) setListo(true)
     }
+    cargarSesionRecuperacion().catch((reason: unknown) => {
+      if (vigente) setError(reason instanceof Error ? reason.message : 'El enlace no es válido.')
+    })
     return () => {
       vigente = false
       listener.subscription.unsubscribe()
     }
-  }, [])
+  }, [auth])
 
   const guardar = async (event: FormEvent) => {
     event.preventDefault()
@@ -40,10 +59,10 @@ export function RestablecerClave() {
     if (clave !== confirmacion) return setError('Las contraseñas no coinciden.')
     setGuardando(true)
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password: clave })
+      const { error: updateError } = await auth.auth.updateUser({ password: clave })
       if (updateError) throw updateError
-      await supabase.auth.signOut()
-      navigate('/login', { replace: true })
+      await auth.auth.signOut()
+      navigate(propietario ? '/propietario' : '/login', { replace: true })
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo cambiar la contraseña.')
     } finally {
@@ -63,7 +82,7 @@ export function RestablecerClave() {
           <div className="form">
             <h2>Enlace pendiente o vencido</h2>
             <p>{error || 'Abrí el enlace más reciente que recibiste. Si venció, solicita uno nuevo.'}</p>
-            <Link className="link" to="/recuperar">Solicitar otro enlace</Link>
+            <Link className="link" to={propietario ? '/recuperar?owner=1' : '/recuperar'}>Solicitar otro enlace</Link>
           </div>
         ) : (
           <form onSubmit={guardar}>

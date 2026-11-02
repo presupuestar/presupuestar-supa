@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Isotipo } from '../components/Isotipo'
-import { supabase } from '../lib/supabase'
+import { supabase, supabasePropietario } from '../lib/supabase'
 
 export function RecuperarClave() {
+  const propietario = new URLSearchParams(window.location.search).get('owner') === '1'
+  const auth = propietario ? supabasePropietario : supabase
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [enviado, setEnviado] = useState(false)
@@ -14,8 +16,8 @@ export function RecuperarClave() {
     setError('')
     setEnviando(true)
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/restablecer`,
+      const { error: resetError } = await auth.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/restablecer${propietario ? '?owner=1' : ''}`,
       })
       if (resetError) throw resetError
       setEnviado(true)
@@ -38,7 +40,7 @@ export function RecuperarClave() {
           <div className="form">
             <h2>Revisá tu correo</h2>
             <p>Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña.</p>
-            <Link className="link" to="/login">Volver a ingresar</Link>
+            <Link className="link" to={propietario ? '/propietario' : '/login'}>Volver a ingresar</Link>
           </div>
         ) : (
           <form onSubmit={enviar}>
@@ -48,7 +50,7 @@ export function RecuperarClave() {
             </label>
             {error && <p className="error" role="alert">{error}</p>}
             <button className="btn" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar enlace'}</button>
-            <Link className="link" to="/login">Volver a ingresar</Link>
+            <Link className="link" to={propietario ? '/propietario' : '/login'}>Volver a ingresar</Link>
           </form>
         )}
       </section>

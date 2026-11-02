@@ -406,10 +406,12 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
             </div>}
           </div>
           <button className="btn sec chico" onClick={agregarPersonalizado}>+ Agregar ítem personalizado</button>
-          <label className="campo ajuste-general">Incremento por inflación (%)
-            <input inputMode="decimal" value={ajusteGeneral} onChange={(e) => setAjusteGeneral(e.target.value)} placeholder="Ej.: 10" />
-          </label>
-          <button type="button" className="btn sec chico" onClick={incrementarTodo}>Agregar incremento como ítem</button>
+          {inicial && <>
+            <div className="ajuste-general">
+              <input aria-label="Porcentaje de incremento por inflación" inputMode="decimal" value={ajusteGeneral} onChange={(e) => setAjusteGeneral(e.target.value)} placeholder="10%" />
+              <button type="button" className="btn sec chico" onClick={incrementarTodo}>Incremento por inflación</button>
+            </div>
+          </>}
         </div>
       </section>
 

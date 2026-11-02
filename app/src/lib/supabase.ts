@@ -7,4 +7,13 @@ if (!url || !publishableKey) {
   throw new Error('Falta configurar VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en app/.env.local.')
 }
 
-export const supabase = createClient(url, publishableKey)
+export const supabase = createClient(url, publishableKey, {
+  auth: { detectSessionInUrl: false },
+})
+
+export const supabasePropietario = createClient(url, publishableKey, {
+  auth: {
+    storageKey: 'presupuestar-owner-auth',
+    detectSessionInUrl: false,
+  },
+})

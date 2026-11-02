@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
 import { ClaveDialog } from '../components/ClaveDialog'
 import { Isotipo } from '../components/Isotipo'
 import { VolverArriba } from '../components/PreferenciasVisuales'
-import { useSesion } from '../context/Sesion'
 import { generarClave } from '../lib/clave'
 import { mensajeError } from '../lib/errores'
 import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
-import { supabase } from '../lib/supabase'
+import { supabasePropietario as supabase } from '../lib/supabase'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import type { Empresa as EmpresaApp, Estado, Linea, Presupuesto } from '../lib/tipos'
@@ -73,7 +73,8 @@ async function platformAction(body: Record<string, unknown>) {
 }
 
 export function PropietarioSupabase() {
-  const { usuario, entrar, salir, cargando } = useSesion()
+  const [usuario, setUsuario] = useState<{ id: string; email: string; rol: string } | null>(null)
+  const [cargando, setCargando] = useState(true)
   const { id } = useParams()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -91,6 +92,53 @@ export function PropietarioSupabase() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const createDialog = useRef<HTMLDialogElement>(null)
   const deleteDialog = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    let vigente = true
+    const cargarPropietario = async (session: Session | null) => {
+      if (!session?.user) {
+        if (vigente) {
+          setUsuario(null)
+          setCargando(false)
+        }
+        return
+      }
+      try {
+        const { data: esPropietario, error: ownerError } = await supabase.rpc('is_platform_owner')
+        if (ownerError) throw ownerError
+        if (vigente) setUsuario({
+          id: session.user.id,
+          email: session.user.email ?? '',
+          rol: esPropietario ? 'propietario' : 'usuario',
+        })
+      } catch (e) {
+        if (vigente) {
+          setUsuario(null)
+          setError(mensajeError(e, 'No se pudo validar el acceso del propietario.'))
+        }
+      } finally {
+        if (vigente) setCargando(false)
+      }
+    }
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      queueMicrotask(() => { void cargarPropietario(session) })
+    })
+    supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (sessionError) throw sessionError
+      return cargarPropietario(data.session)
+    }).catch((e: unknown) => {
+      if (vigente) {
+        setError(mensajeError(e, 'No se pudo validar la sesión del propietario.'))
+        setCargando(false)
+      }
+    })
+
+    return () => {
+      vigente = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
 
   useEffect(() => {
     if (showCreate && createDialog.current && !createDialog.current.open) createDialog.current.showModal()
@@ -156,9 +204,14 @@ export function PropietarioSupabase() {
   const iniciarSesion = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
-    try { await entrar(email.trim(), password) }
+    try {
+      const { error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (loginError) throw loginError
+    }
     catch (e) { setError(mensajeError(e, 'No se pudo iniciar sesión.')) }
   }
+
+  const salir = () => { void supabase.auth.signOut() }
 
   const createCompany = async (event: FormEvent) => {
     event.preventDefault()
@@ -208,7 +261,7 @@ export function PropietarioSupabase() {
             <h2>Ingresá con tu cuenta de Supabase</h2>
             <label>Correo electrónico<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
             <label>Contraseña<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
-            <Link className="link" to="/recuperar">¿Olvidaste tu contraseña?</Link>
+            <Link className="link" to="/recuperar?owner=1">¿Olvidaste tu contraseña?</Link>
             {error && <p className="error" role="alert">{error}</p>}
             <button className="btn">Ingresar</button>
           </form>
