@@ -246,9 +246,9 @@ export function Historial() {
                     </select>}
                   </td>
                   <td className="acciones campo-acciones">
-                    <button className="link" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
-                    {sePuedeEditar(p.estado) && <Link className="link" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
-                    <button className="link peligro" onClick={() => eliminar(p)}>Eliminar</button>
+                    <button className="accion-historial" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
+                    {sePuedeEditar(p.estado) && <Link className="accion-historial" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
+                    <button className="accion-historial peligro" onClick={() => eliminar(p)}>Eliminar</button>
                   </td>
                 </tr>
               ))}

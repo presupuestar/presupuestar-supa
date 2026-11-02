@@ -286,6 +286,11 @@ a.btn{text-decoration:none;text-align:center}
 .filtros{margin-top:28px}
 .filtro-estado{font:500 14px var(--fuente-texto);padding:10px 12px;border:1.5px solid var(--linea);border-radius:12px;background:#fff;color:var(--tinta)}
 .estado-sel{font:600 12.5px var(--fuente-texto);border-radius:999px;padding:5px 10px;border:1.5px solid transparent;cursor:pointer;max-width:190px}
+.accion-historial{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:4px 10px;border:1px solid color-mix(in srgb,var(--acento) 28%,#fff);border-radius:999px;background:color-mix(in srgb,var(--acento) 12%,#fff);color:var(--primario);font:600 12.5px/1.2 var(--fuente-texto);text-decoration:none;cursor:pointer;transition:background-color 150ms ease,border-color 150ms ease}
+.accion-historial:hover{background:color-mix(in srgb,var(--acento) 20%,#fff);border-color:color-mix(in srgb,var(--acento) 42%,#fff)}
+.accion-historial.peligro{border-color:color-mix(in srgb,var(--no) 24%,#fff);background:color-mix(in srgb,var(--no) 8%,#fff);color:var(--no)}
+.accion-historial.peligro:hover{border-color:color-mix(in srgb,var(--no) 40%,#fff);background:color-mix(in srgb,var(--no) 14%,#fff)}
+.accion-historial:disabled{opacity:.55;cursor:wait}
 .estado-sel.borrador{background:#EEF1F6;color:var(--muted)}
 .estado-sel.pendiente{background:#FDF1D6;color:#7A5300}
 .estado-sel.aceptado{background:#DDF4EA;color:#12643F}
@@ -444,7 +449,7 @@ a.link{color:var(--primario)}
   .tabla-historial .campo-total::before{content:'TOTAL'}
   .tabla-historial .campo-cliente small{font-size:10px;line-height:1.3;overflow-wrap:anywhere}
   .tabla-historial .estado-sel{max-width:100%;padding:4px 5px;font-size:11px}
-  .tabla-historial .campo-acciones{grid-column:1/-1;grid-row:4;display:flex;gap:18px;justify-content:flex-start;padding:7px 9px;background:var(--niebla);font-size:12px}
+  .tabla-historial .campo-acciones{grid-column:1/-1;grid-row:4;display:flex;align-items:center;gap:6px;justify-content:flex-start;padding:7px 9px;background:var(--niebla);font-size:12px}
   .tabla-historial tfoot{display:block}
   .tabla-historial tfoot tr{display:flex;justify-content:space-between;gap:8px;padding:10px 4px}
   .tabla-historial tfoot td{padding:0;font-size:12px}
