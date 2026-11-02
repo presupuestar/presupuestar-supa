@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
+import { GraficoBarras } from '../components/GraficoBarras'
+import { GraficoCircular, type ColorSegmento } from '../components/GraficoCircular'
 import { useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
@@ -61,8 +63,61 @@ export function Historial() {
   useEffect(() => { cargar() }, [])
 
   const resumen = useMemo(() => repositorio.resumenMensual(lista ?? []), [lista])
+  const resumenPeriodo = useMemo(() => {
+    const acumulados = new Map<string, {
+      mes: string
+      moneda: string
+      cantidad: number
+      presupuestado: number
+      aceptado: number
+      rechazado: number
+      pendiente: number
+      ganancia: number
+    }>()
+    for (const fila of resumen) {
+      if (mes && fila.mes !== mes) continue
+      const moneda = normalizarMoneda(fila.moneda)
+      const actual = acumulados.get(moneda) ?? {
+        mes: fila.mes, moneda, cantidad: 0, presupuestado: 0, aceptado: 0, rechazado: 0, pendiente: 0, ganancia: 0,
+      }
+      actual.cantidad += fila.cantidad
+      actual.presupuestado += fila.presupuestado
+      actual.aceptado += fila.aceptado
+      actual.rechazado += fila.rechazado
+      actual.pendiente += fila.pendiente
+      actual.ganancia += fila.ganancia
+      acumulados.set(moneda, actual)
+    }
+    return [...acumulados.values()]
+  }, [resumen, mes])
+  const tendencias = useMemo(() => [...new Set(resumen.map((fila) => normalizarMoneda(fila.moneda)))].map((moneda) => ({
+    moneda,
+    datos: resumen
+      .filter((fila) => normalizarMoneda(fila.moneda) === moneda)
+      .sort((a, b) => a.mes.localeCompare(b.mes))
+      .slice(-12)
+      .map((fila) => ({
+        clave: fila.mes,
+        etiqueta: nombreMes(fila.mes),
+        valor: fila.presupuestado,
+        valorTexto: importeEnMoneda(fila.presupuestado, fila.moneda),
+        color: `mes-${Number(fila.mes.slice(5, 7))}` as ColorSegmento,
+      })),
+  })), [resumen])
   // Ranking de ventas por persona (solo lo ve el administrador). Respeta el mes elegido en el resumen.
   const ranking = useMemo(() => repositorio.resumenPorVendedor((lista ?? []).filter((p) => !mes || mesDe(p) === mes)), [lista, mes])
+  const ventasPorMoneda = useMemo(() => [...new Set(ranking.map((fila) => normalizarMoneda(fila.moneda)))].map((moneda) => ({
+    moneda,
+    datos: ranking
+      .filter((fila) => normalizarMoneda(fila.moneda) === moneda && fila.vendido > 0)
+      .map((fila, index) => ({
+        clave: fila.clave,
+        etiqueta: fila.nombre,
+        valor: fila.vendido,
+        valorTexto: importeEnMoneda(fila.vendido, fila.moneda),
+        color: `vendedor-${(index % 8) + 1}` as ColorSegmento,
+      })),
+  })), [ranking])
   const vendedores = useMemo(() => {
     const m = new Map<string, string>()
     for (const p of lista ?? []) m.set(p.vendedorEmail || '', p.vendedorNombre || p.vendedorEmail || 'Sin asignar')
@@ -127,74 +182,65 @@ export function Historial() {
         <div className="encabezado">
           <div>
             <h1>Historial</h1>
-            <p className="sub">{esAdmin
-              ? 'Todos los presupuestos de la empresa y quién hizo cada uno: descargá el PDF, editá los que aún no tuvieron respuesta y marcá si fueron aceptados o rechazados.'
-              : 'Los presupuestos que hiciste vos: descargá el PDF, editá los que aún no tuvieron respuesta y marcá si fueron aceptados o rechazados.'}</p>
+            <p className="sub">{esAdmin ? 'Presupuestos de la empresa.' : 'Tus presupuestos.'}</p>
           </div>
           <Link className="btn chico" to="/nuevo">Nuevo presupuesto</Link>
         </div>
 
         {error && <p className="error" role="alert">{error}</p>}
 
-        <SeccionDesplegable titulo="Resumen mensual">
+        <SeccionDesplegable titulo={<>Resumen visual <span className="periodo">{mes ? nombreMes(mes) : 'todo el historial'}</span></>}>
           {resumen.length === 0 ? (
-            <p className="vacio-linea">Cuando emitas presupuestos, acá vas a ver cuánto presupuestaste cada mes, cuánto te aceptaron, la ganancia mensual de los presupuestos aceptados y tu tasa de conversión.</p>
+            <p className="vacio-linea">Sin datos en este período.</p>
           ) : (
             <>
-              <div className="tabla-caja">
-                <table className="tabla resumen-tabla">
-                  <thead><tr><th>Mes</th><th className="num">Presupuestos</th><th className="num">Presupuestado</th><th className="num">Aceptado</th><th className="num">Ganancia mensual</th><th className="num">Rechazado</th><th className="num">Pendiente</th><th className="num">Conversión</th></tr></thead>
-                  <tbody>
-                    {resumen.map((r) => (
-                      <tr key={`${r.mes}-${r.moneda}`} className={mes === r.mes ? 'sel' : ''} onClick={() => setMes(mes === r.mes ? null : r.mes)} title="Tocá para filtrar la lista por este mes">
-                        <td data-label="Mes"><strong>{nombreMes(r.mes)} ({normalizarMoneda(r.moneda)})</strong></td>
-                        <td data-label="Presupuestos" className="num">{r.cantidad}</td>
-                        <td data-label="Presupuestado" className="num">{importeEnMoneda(r.presupuestado, r.moneda)}</td>
-                        <td data-label="Aceptado" className="num ok">{importeEnMoneda(r.aceptado, r.moneda)}</td>
-                        <td data-label="Ganancia mensual" className="num ok">{importeEnMoneda(r.ganancia, r.moneda)}</td>
-                        <td data-label="Rechazado" className="num no">{importeEnMoneda(r.rechazado, r.moneda)}</td>
-                        <td data-label="Pendiente" className="num pe">{importeEnMoneda(r.pendiente, r.moneda)}</td>
-                        <td data-label="Conversión" className="num conv">{r.conversionPct}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="graficos-circulares">
+                {resumenPeriodo.map((r) => (
+                  <GraficoCircular
+                    key={r.moneda}
+                    titulo={`Estado de presupuestos · ${r.moneda}`}
+                    total={importeEnMoneda(r.presupuestado, r.moneda)}
+                    detalle={{ etiqueta: 'Ganancia de aceptados', importe: importeEnMoneda(r.ganancia, r.moneda) }}
+                    segmentos={[
+                      { etiqueta: 'Aceptado', valor: r.aceptado, importe: importeEnMoneda(r.aceptado, r.moneda), color: 'aceptado' },
+                      { etiqueta: 'Pendiente', valor: r.pendiente, importe: importeEnMoneda(r.pendiente, r.moneda), color: 'pendiente' },
+                      { etiqueta: 'Rechazado', valor: r.rechazado, importe: importeEnMoneda(r.rechazado, r.moneda), color: 'rechazado' },
+                    ]}
+                  />
+                ))}
               </div>
-              <p className="ayuda">Conversión = presupuestos aceptados sobre los emitidos en el mes (los borradores no cuentan). Tocá un mes para filtrar la lista.</p>
+              <div className="graficos-barras">
+                {tendencias.map((tendencia) => (
+                  <GraficoBarras
+                    key={tendencia.moneda}
+                    titulo={`Presupuestado por mes · ${tendencia.moneda}`}
+                    datos={tendencia.datos}
+                    seleccionado={mes}
+                    alSeleccionar={(clave) => setMes(mes === clave ? null : clave)}
+                  />
+                ))}
+              </div>
             </>
           )}
         </SeccionDesplegable>
 
         {esAdmin && (
           <SeccionDesplegable titulo={<>Ventas por empleado <span className="periodo">{mes ? nombreMes(mes) : 'todo el historial'}</span></>}>
-            {ranking.length === 0 ? (
-              <p className="vacio-linea">Todavía no hay presupuestos emitidos {mes ? 'en este mes' : ''}.</p>
+            {!ranking.some((fila) => fila.vendido > 0) ? (
+              <p className="vacio-linea">Sin ventas aceptadas en este período.</p>
             ) : (
               <>
-                <div className="tabla-caja">
-                  <table className="tabla resumen-tabla ranking">
-                    <thead><tr><th>#</th><th>Empleado</th><th className="num">Emitidos</th><th className="num">Aceptados</th><th className="num">Vendido</th><th className="num">Presupuestado</th><th className="num">Rechazado</th><th className="num">Pendiente</th><th className="num">Conversión</th></tr></thead>
-                    <tbody>
-                      {ranking.map((r) => {
-                        const puesto = r.clave === '' ? 0 : ranking.filter((x) => x.clave !== '').indexOf(r) + 1
-                        return (
-                        <tr key={`${r.clave || 'sin-asignar'}-${r.moneda}`} onClick={() => setVendedor(vendedor === r.clave ? 'todos' : r.clave)} className={vendedor === r.clave ? 'sel' : ''} title="Tocá para ver solo sus presupuestos">
-                          <td data-label="#">{puesto || '—'}</td>
-                          <td data-label="Empleado"><strong>{r.nombre}</strong><small>{normalizarMoneda(r.moneda)}</small>{puesto === 1 && r.vendido > 0 && <span className="pill pers">Más ventas</span>}{r.clave === '' && <small>Presupuestos anteriores al registro de vendedores</small>}</td>
-                          <td data-label="Emitidos" className="num">{r.cantidad}</td>
-                          <td data-label="Aceptados" className="num">{r.aceptados}</td>
-                          <td data-label="Vendido" className="num ok">{importeEnMoneda(r.vendido, r.moneda)}</td>
-                          <td data-label="Presupuestado" className="num">{importeEnMoneda(r.presupuestado, r.moneda)}</td>
-                          <td data-label="Rechazado" className="num no">{importeEnMoneda(r.rechazado, r.moneda)}</td>
-                          <td data-label="Pendiente" className="num pe">{importeEnMoneda(r.pendiente, r.moneda)}</td>
-                          <td data-label="Conversión" className="num conv">{r.conversionPct}%</td>
-                        </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                <div className="graficos-barras">
+                  {ventasPorMoneda.filter((grupo) => grupo.datos.length > 0).map((grupo) => (
+                    <GraficoBarras
+                      key={grupo.moneda}
+                      titulo={`Ventas aceptadas · ${grupo.moneda}`}
+                      datos={grupo.datos}
+                      seleccionado={vendedor === 'todos' ? null : vendedor}
+                      alSeleccionar={(clave) => setVendedor(vendedor === clave ? 'todos' : clave)}
+                    />
+                  ))}
                 </div>
-                <p className="ayuda">"Vendido" es el total de los presupuestos que el cliente aceptó. Los borradores no cuentan. Tocá un mes del resumen para ver el ranking de ese mes, o una persona para filtrar la lista.</p>
               </>
             )}
           </SeccionDesplegable>
@@ -245,10 +291,12 @@ export function Historial() {
                       {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
                     </select>}
                   </td>
-                  <td className="acciones campo-acciones">
-                    <button className="accion-historial" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
-                    {sePuedeEditar(p.estado) && <Link className="accion-historial" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
-                    <button className="accion-historial peligro" onClick={() => eliminar(p)}>Eliminar</button>
+                  <td className="campo-acciones">
+                    <div className="acciones-historial">
+                      <button className="accion-historial" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
+                      {sePuedeEditar(p.estado) && <Link className="accion-historial" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
+                      <button className="accion-historial peligro" onClick={() => eliminar(p)}>Eliminar</button>
+                    </div>
                   </td>
                 </tr>
               ))}

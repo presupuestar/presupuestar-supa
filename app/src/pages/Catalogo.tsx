@@ -431,7 +431,7 @@ export function Catalogo() {
               <div className="tabla-caja importacion-caja">
                 <table className="tabla tabla-importacion">
                   <thead><tr><th>Incluir</th><th>Ítem</th><th className="num">Precio unitario</th><th>Moneda</th></tr></thead>
-                  <tbody>
+                  <tbody key={paginaCandidatos}>
                     {candidatos.slice(paginaCandidatos * ITEMS_POR_PAGINA, (paginaCandidatos + 1) * ITEMS_POR_PAGINA).map((c) => (
                       <tr key={c.key} className={`${c.seleccionado ? '' : 'apagado'}${c.error ? ' importacion-fallida' : ''}`}>
                         <td><input type="checkbox" checked={c.seleccionado} aria-label={`Incluir ${c.nombre}`} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, seleccionado: e.target.checked } : x))} /></td>
@@ -490,35 +490,23 @@ export function Catalogo() {
           <button type="button" className="btn sec chico" disabled={paginaItems >= paginasItems - 1} onClick={() => setPaginaItems((pagina) => Math.min(paginasItems - 1, pagina + 1))}>Siguiente</button>
         </div>}
 
-        <details className="acciones-catalogo-plegable catalogo-desplegable">
-          <summary className="catalogo-desplegable-resumen">
-            <span>
-              <strong>Acciones de selección</strong>
-              <small>{cantidadSeleccionada} ítem{cantidadSeleccionada === 1 ? '' : 's'} seleccionado{cantidadSeleccionada === 1 ? '' : 's'}</small>
-            </span>
-            <span className="catalogo-desplegable-icono" aria-hidden="true" />
-          </summary>
-          <div className="acciones-catalogo" aria-label="Acciones de selección">
-          <div className="catalogo-seleccion">
-            <span className="seleccion-conteo">{cantidadSeleccionada} seleccionado{cantidadSeleccionada === 1 ? '' : 's'} · {visibles.length} resultado{visibles.length === 1 ? '' : 's'}</span>
-            <button type="button" className="btn sec chico" disabled={visibles.length === 0 || todosVisiblesSeleccionados || procesandoLote || confirmarEliminacion} onClick={() => seleccionarVisibles(true)}>Seleccionar resultados</button>
-            <button type="button" className="link" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => setSeleccionados(new Set())}>Quitar selección</button>
+        <div className="barra-seleccion-catalogo" aria-label="Acciones de selección">
+          <span className="seleccion-conteo">{cantidadSeleccionada} seleccionado{cantidadSeleccionada === 1 ? '' : 's'}</span>
+          <button type="button" className="btn sec chico" disabled={visibles.length === 0 || procesandoLote || confirmarEliminacion} onClick={() => seleccionarVisibles(!todosVisiblesSeleccionados)}>
+            {todosVisiblesSeleccionados ? 'Quitar resultados' : 'Seleccionar resultados'}
+          </button>
+          <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => setSeleccionados(new Set())}>Limpiar</button>
+          <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('activar')}>Activar</button>
+          <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('desactivar')}>Desactivar</button>
+          <div className="asignar-proveedor">
+            <label className="sr" htmlFor="proveedor-seleccionados">Mayorista para los seleccionados</label>
+            <input id="proveedor-seleccionados" value={proveedorSeleccion} onChange={(e) => setProveedorSeleccion(e.target.value)} maxLength={160} placeholder="Mayorista" disabled={cantidadSeleccionada === 0 || confirmarEliminacion || procesandoLote} />
+            <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('proveedor')}>Asignar</button>
           </div>
-          <div className="catalogo-acciones-lote">
-            <span>Acciones para seleccionados</span>
-            <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('activar')}>Activar</button>
-            <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('desactivar')}>Desactivar</button>
-            <div className="asignar-proveedor">
-              <label className="sr" htmlFor="proveedor-seleccionados">Mayorista para los seleccionados</label>
-              <input id="proveedor-seleccionados" value={proveedorSeleccion} onChange={(e) => setProveedorSeleccion(e.target.value)} maxLength={160} placeholder="Nombre del mayorista" disabled={confirmarEliminacion || procesandoLote} />
-              <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('proveedor')}>Asignar mayorista</button>
-            </div>
-            <button type="button" className="btn sec chico peligro-catalogo" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('eliminar')}>
-              {procesandoLote ? 'Procesando…' : `Eliminar${cantidadSeleccionada ? ` (${cantidadSeleccionada})` : ''}`}
-            </button>
-          </div>
+          <button type="button" className="btn sec chico peligro-catalogo" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('eliminar')}>
+            {procesandoLote ? 'Procesando…' : 'Eliminar'}
+          </button>
         </div>
-        </details>
 
         <dialog
           ref={confirmacionRef}
@@ -554,7 +542,7 @@ export function Catalogo() {
           <div className="tabla-caja">
           <table className="tabla tabla-catalogo">
             <thead><tr><th>Ítem</th><th>Proveedor / mayorista</th><th>Unidad</th><th className="num">Precio</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
-            <tbody>
+            <tbody key={paginaItems}>
               {productos.map((i) => (
                 <tr key={i.id} className={`${i.activo ? '' : 'apagado'}${seleccionados.has(i.id) ? ' seleccionado' : ''}`}>
                   <td className="catalogo-nombre">

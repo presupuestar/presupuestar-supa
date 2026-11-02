@@ -26,6 +26,7 @@ export function Equipo() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [clave, setClave] = useState(generarClave())
+  const [verClave, setVerClave] = useState(false)
   const [rolNuevoUsuario, setRolNuevoUsuario] = useState('member')
   const [guardando, setGuardando] = useState(false)
   const [roles, setRoles] = useState<RolEmpresa[]>([])
@@ -54,7 +55,7 @@ export function Equipo() {
     try {
       await repositorio.usuarios.crear({ name: nombre.trim(), email: email.trim(), password: clave, role: rolNuevoUsuario })
       setAviso({ texto: `${nombre.trim()} ya puede ingresar. Copiá los datos de acceso y pasáselos: la contraseña no se vuelve a mostrar.`, copiar: mensajeAcceso(nombre.trim(), email.trim(), clave) })
-      setNombre(''); setEmail(''); setClave(generarClave()); setRolNuevoUsuario('member'); setCopiado(false)
+      setNombre(''); setEmail(''); setClave(generarClave()); setVerClave(false); setRolNuevoUsuario('member'); setCopiado(false)
       await cargar()
     } catch (e) { setError(mensajeError(e, 'No se pudo crear el empleado.')) }
     finally { setGuardando(false) }
@@ -141,7 +142,10 @@ export function Equipo() {
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
             </label>
             <label className="campo">Contraseña inicial
-              <input value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" spellCheck={false} />
+              <span className="campo-password-primer">
+                <input type={verClave ? 'text' : 'password'} value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="new-password" spellCheck={false} />
+                <button type="button" className="ojo-password" aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'} title={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setVerClave(!verClave)}><span aria-hidden="true" /></button>
+              </span>
               <button type="button" className="link ayuda-link" onClick={() => setClave(generarClave())}>Generar otra</button>
             </label>
             <label className="campo">Rol
