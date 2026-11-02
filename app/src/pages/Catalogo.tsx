@@ -366,114 +366,10 @@ export function Catalogo() {
             <h1>Catálogo</h1>
             <p className="sub">Los ítems que cargás una vez y después elegís al armar cada presupuesto.</p>
           </div>
-        </div>
-
-        <details className="panel importador-pdf catalogo-desplegable" id="pdf-catalogo" ref={importadorPdf}>
-          <summary className="catalogo-desplegable-resumen" onClick={(e) => {
-            if (leyendoPdf || guardandoPdf) e.preventDefault()
-          }}>
-            <span>
-              <strong>Importar ítems desde PDF</strong>
-              <small>{leyendoPdf
-                ? progresoLectura || 'Leyendo PDF…'
-                : guardandoPdf
-                  ? progresoGuardado || 'Sincronizando ítems…'
-                  : candidatos.length > 0
-                    ? `${candidatos.length} ítems listos para revisar`
-                    : 'Cargar o actualizar ítems del catálogo'}</small>
-            </span>
-            <span className="catalogo-desplegable-icono" aria-hidden="true" />
-          </summary>
-          <div className="importador-contenido">
-          <div className="botones importador-acciones">
-            <button type="button" className="btn sec chico" onClick={() => pdfInput.current?.click()}>Importar PDF</button>
+          <div className="encabezado-acciones">
             <button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Nuevo ítem</button>
           </div>
-          <p className="ayuda">Leemos catálogos con texto seleccionable y detectamos filas que terminan en un precio. La moneda explícita del PDF (incluida la que aparece junto al precio) prevalece; al reimportar, también corregimos la moneda de registros existentes con el mismo nombre, mayorista e importe.</p>
-          <div className="dos">
-            <label className="campo">Archivo PDF
-              <input ref={pdfInput} type="file" accept="application/pdf,.pdf" onChange={(e) => { setArchivoPdf(e.target.files?.[0] ?? null); setCandidatos([]); setError(''); setMensajeImportacion('') }} />
-            </label>
-            <label className="campo">Mayorista del catálogo <small>(obligatorio · uso interno)</small>
-              <select required value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)}>
-                <option value="">Elegí un mayorista…</option>
-                {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
-                <option value={NUEVO_MAYORISTA}>+ Crear nuevo mayorista</option>
-              </select>
-            </label>
-            {proveedorPdf === NUEVO_MAYORISTA && (
-              <label className="campo">Nombre del nuevo mayorista
-                <input required value={nuevoProveedorPdf} onChange={(e) => setNuevoProveedorPdf(e.target.value)} maxLength={160} placeholder="Ej.: Corralón San Martín" />
-              </label>
-            )}
-          </div>
-          <div className="botones importador-acciones">
-            <button type="button" className="btn sec chico" disabled={!archivoPdf || leyendoPdf || guardandoPdf} onClick={procesarPdf}>
-              {leyendoPdf ? 'Leyendo PDF…' : 'Leer PDF'}
-            </button>
-          </div>
-          {error && <p className="error" role="alert">{error}</p>}
-          {candidatos.length > 0 && (
-            <>
-              <div className="revision-importacion">
-                <div>
-                  <h3>Revisá los ítems detectados</h3>
-                  <p className="ayuda">Se detectaron {candidatos.length} ítems con precio válido. Los que comparten nombre pero tienen distinto precio o moneda se agregan por separado automáticamente. Si el PDF no indica una moneda, se toma como ARS; las filas sin precio se descartan.</p>
-                  {candidatos.some((c) => c.error) && <p className="error" role="alert">{candidatos.filter((c) => c.error).length} ítems requieren revisión. Están desmarcados: revisá el motivo y corregí los datos si hace falta. Podés seleccionar todos juntos para reintentarlos o marcar solo algunos.</p>}
-                </div>
-                <button type="button" className="btn sec chico" onClick={() => revisionFinal.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}>Ir al final para aprobar ↓</button>
-              </div>
-              {candidatos.some((c) => !c.seleccionado) && <div className="botones importador-acciones">
-                <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={() => setCandidatos((actuales) => actuales.map((c) => ({ ...c, seleccionado: true })))}>
-                  Seleccionar todos para reintentar
-                </button>
-              </div>}
-              <div className="tabla-caja importacion-caja">
-                <table className="tabla tabla-importacion">
-                  <thead><tr><th>Incluir</th><th>Ítem</th><th className="num">Precio unitario</th><th>Moneda</th></tr></thead>
-                  <tbody key={paginaCandidatos}>
-                    {candidatos.slice(paginaCandidatos * ITEMS_POR_PAGINA, (paginaCandidatos + 1) * ITEMS_POR_PAGINA).map((c) => (
-                      <tr key={c.key} className={`${c.seleccionado ? '' : 'apagado'}${c.error ? ' importacion-fallida' : ''}`}>
-                        <td><input type="checkbox" checked={c.seleccionado} aria-label={`Incluir ${c.nombre}`} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, seleccionado: e.target.checked } : x))} /></td>
-                        <td>
-                          <input className="importacion-campo" aria-label="Nombre del ítem" value={c.nombre} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, nombre: e.target.value } : x))} />
-                          {c.error && <small className="importacion-error" role="alert"><strong>No se pudo cargar:</strong> {c.error}</small>}
-                        </td>
-                        <td><input className="importacion-campo precio" aria-label={`Precio de ${c.nombre}`} inputMode="decimal" value={c.precio} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, precio: e.target.value } : x))} /></td>
-                        <td><span className="pill pers">{c.moneda}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {candidatos.length > ITEMS_POR_PAGINA && <div className="paginacion-catalogo">
-                <button type="button" className="btn sec chico" disabled={paginaCandidatos === 0} onClick={() => setPaginaCandidatos((pagina) => Math.max(0, pagina - 1))}>Anterior</button>
-                <span>Ítems {paginaCandidatos * ITEMS_POR_PAGINA + 1}–{Math.min((paginaCandidatos + 1) * ITEMS_POR_PAGINA, candidatos.length)} de {candidatos.length}</span>
-                <button type="button" className="btn sec chico" disabled={paginaCandidatos >= Math.ceil(candidatos.length / ITEMS_POR_PAGINA) - 1} onClick={() => setPaginaCandidatos((pagina) => pagina + 1)}>Siguiente</button>
-              </div>}
-              <div className="importacion-pie" ref={revisionFinal}>
-                {mensajeImportacion && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
-                {guardandoPdf && <div className="importador-progreso" role="status" aria-live="polite">
-                  <span className="indicador-carga" aria-hidden="true" />
-                  <span>{progresoGuardado || 'Sincronizando ítems…'}</span>
-                </div>}
-                <div className="botones importador-acciones revision-acciones">
-                  <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={rechazarLectura}>Cancelar revisión</button>
-                  <button type="button" className="btn chico" disabled={guardandoPdf || leyendoPdf || candidatos.every((c) => !c.seleccionado)} onClick={guardarImportacion}>
-                    {guardandoPdf ? 'Sincronizando…' : candidatos.some((c) => c.seleccionado && c.error)
-                      ? `Reintentar y sincronizar ${candidatos.filter((c) => c.seleccionado).length} ítems`
-                      : `Aprobar y sincronizar ${candidatos.filter((c) => c.seleccionado).length} ítems`}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          {leyendoPdf && <div className="importacion-pie importacion-lectura-pie" role="status" aria-live="polite">
-            <div className="importador-progreso"><span className="indicador-carga" aria-hidden="true" /><span>{progresoLectura || 'Leyendo PDF…'}</span></div>
-          </div>}
-          {mensajeImportacion && candidatos.length === 0 && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
-          </div>
-        </details>
+        </div>
 
         <div className="filtros">
           <input type="search" placeholder="Buscar ítem…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar ítem" />
@@ -570,6 +466,112 @@ export function Catalogo() {
           </div>
         </details>
         ))}
+
+        <details className="panel importador-pdf catalogo-desplegable" id="pdf-catalogo" ref={importadorPdf}>
+          <summary className="catalogo-desplegable-resumen" onClick={(e) => {
+            if (leyendoPdf || guardandoPdf) e.preventDefault()
+          }}>
+            <span>
+              <strong>Importar ítems desde PDF</strong>
+              <small>{leyendoPdf
+                ? progresoLectura || 'Leyendo PDF…'
+                : guardandoPdf
+                  ? progresoGuardado || 'Sincronizando ítems…'
+                  : candidatos.length > 0
+                    ? `${candidatos.length} ítems listos para revisar`
+                    : 'Cargar o actualizar ítems del catálogo'}</small>
+            </span>
+            <span className="catalogo-desplegable-icono" aria-hidden="true" />
+          </summary>
+          <div className="importador-contenido">
+            <div className="botones importador-acciones">
+              <button type="button" className="btn sec chico" onClick={() => pdfInput.current?.click()}>Importar PDF</button>
+            </div>
+            <p className="ayuda">Leemos catálogos con texto seleccionable y detectamos filas que terminan en un precio. La moneda explícita del PDF (incluida la que aparece junto al precio) prevalece; al reimportar, también corregimos la moneda de registros existentes con el mismo nombre, mayorista e importe.</p>
+            <div className="dos">
+              <label className="campo">Archivo PDF
+                <input ref={pdfInput} type="file" accept="application/pdf,.pdf" onChange={(e) => { setArchivoPdf(e.target.files?.[0] ?? null); setCandidatos([]); setError(''); setMensajeImportacion('') }} />
+              </label>
+              <label className="campo">Mayorista del catálogo <small>(obligatorio · uso interno)</small>
+                <select required value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)}>
+                  <option value="">Elegí un mayorista…</option>
+                  {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
+                  <option value={NUEVO_MAYORISTA}>+ Crear nuevo mayorista</option>
+                </select>
+              </label>
+              {proveedorPdf === NUEVO_MAYORISTA && (
+                <label className="campo">Nombre del nuevo mayorista
+                  <input required value={nuevoProveedorPdf} onChange={(e) => setNuevoProveedorPdf(e.target.value)} maxLength={160} placeholder="Ej.: Corralón San Martín" />
+                </label>
+              )}
+            </div>
+            <div className="botones importador-acciones">
+              <button type="button" className="btn sec chico" disabled={!archivoPdf || leyendoPdf || guardandoPdf} onClick={procesarPdf}>
+                {leyendoPdf ? 'Leyendo PDF…' : 'Leer PDF'}
+              </button>
+            </div>
+            {error && <p className="error" role="alert">{error}</p>}
+            {candidatos.length > 0 && (
+              <>
+                <div className="revision-importacion">
+                  <div>
+                    <h3>Revisá los ítems detectados</h3>
+                    <p className="ayuda">Se detectaron {candidatos.length} ítems con precio válido. Los que comparten nombre pero tienen distinto precio o moneda se agregan por separado automáticamente. Si el PDF no indica una moneda, se toma como ARS; las filas sin precio se descartan.</p>
+                    {candidatos.some((c) => c.error) && <p className="error" role="alert">{candidatos.filter((c) => c.error).length} ítems requieren revisión. Están desmarcados: revisá el motivo y corregí los datos si hace falta. Podés seleccionar todos juntos para reintentarlos o marcar solo algunos.</p>}
+                  </div>
+                  <button type="button" className="btn sec chico" onClick={() => revisionFinal.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}>Ir al final para aprobar ↓</button>
+                </div>
+                {candidatos.some((c) => !c.seleccionado) && <div className="botones importador-acciones">
+                  <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={() => setCandidatos((actuales) => actuales.map((c) => ({ ...c, seleccionado: true })))}>
+                    Seleccionar todos para reintentar
+                  </button>
+                </div>}
+                <div className="tabla-caja importacion-caja">
+                  <table className="tabla tabla-importacion">
+                    <thead><tr><th>Incluir</th><th>Ítem</th><th className="num">Precio unitario</th><th>Moneda</th></tr></thead>
+                    <tbody key={paginaCandidatos}>
+                      {candidatos.slice(paginaCandidatos * ITEMS_POR_PAGINA, (paginaCandidatos + 1) * ITEMS_POR_PAGINA).map((c) => (
+                        <tr key={c.key} className={`${c.seleccionado ? '' : 'apagado'}${c.error ? ' importacion-fallida' : ''}`}>
+                          <td><input type="checkbox" checked={c.seleccionado} aria-label={`Incluir ${c.nombre}`} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, seleccionado: e.target.checked } : x))} /></td>
+                          <td>
+                            <input className="importacion-campo" aria-label="Nombre del ítem" value={c.nombre} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, nombre: e.target.value } : x))} />
+                            {c.error && <small className="importacion-error" role="alert"><strong>No se pudo cargar:</strong> {c.error}</small>}
+                          </td>
+                          <td><input className="importacion-campo precio" aria-label={`Precio de ${c.nombre}`} inputMode="decimal" value={c.precio} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, precio: e.target.value } : x))} /></td>
+                          <td><span className="pill pers">{c.moneda}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {candidatos.length > ITEMS_POR_PAGINA && <div className="paginacion-catalogo">
+                  <button type="button" className="btn sec chico" disabled={paginaCandidatos === 0} onClick={() => setPaginaCandidatos((pagina) => Math.max(0, pagina - 1))}>Anterior</button>
+                  <span>Ítems {paginaCandidatos * ITEMS_POR_PAGINA + 1}–{Math.min((paginaCandidatos + 1) * ITEMS_POR_PAGINA, candidatos.length)} de {candidatos.length}</span>
+                  <button type="button" className="btn sec chico" disabled={paginaCandidatos >= Math.ceil(candidatos.length / ITEMS_POR_PAGINA) - 1} onClick={() => setPaginaCandidatos((pagina) => pagina + 1)}>Siguiente</button>
+                </div>}
+                <div className="importacion-pie" ref={revisionFinal}>
+                  {mensajeImportacion && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
+                  {guardandoPdf && <div className="importador-progreso" role="status" aria-live="polite">
+                    <span className="indicador-carga" aria-hidden="true" />
+                    <span>{progresoGuardado || 'Sincronizando ítems…'}</span>
+                  </div>}
+                  <div className="botones importador-acciones revision-acciones">
+                    <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={rechazarLectura}>Cancelar revisión</button>
+                    <button type="button" className="btn chico" disabled={guardandoPdf || leyendoPdf || candidatos.every((c) => !c.seleccionado)} onClick={guardarImportacion}>
+                      {guardandoPdf ? 'Sincronizando…' : candidatos.some((c) => c.seleccionado && c.error)
+                        ? `Reintentar y sincronizar ${candidatos.filter((c) => c.seleccionado).length} ítems`
+                        : `Aprobar y sincronizar ${candidatos.filter((c) => c.seleccionado).length} ítems`}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            {leyendoPdf && <div className="importacion-pie importacion-lectura-pie" role="status" aria-live="polite">
+              <div className="importador-progreso"><span className="indicador-carga" aria-hidden="true" /><span>{progresoLectura || 'Leyendo PDF…'}</span></div>
+            </div>}
+            {mensajeImportacion && candidatos.length === 0 && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
+          </div>
+        </details>
       </main>
 
       {editando && (

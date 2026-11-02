@@ -66,6 +66,7 @@ h1,h2,h3{font-family:var(--fuente-titulos);color:var(--primario);letter-spacing:
 /* catálogo */
 .encabezado{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .encabezado-acciones{display:flex;gap:10px;flex-wrap:wrap}
+.encabezado>.encabezado-acciones{flex:0 0 auto;justify-content:flex-end;margin-left:auto}
 .importador-pdf{scroll-margin-top:20px}
 .catalogo-desplegable>summary{list-style:none;cursor:pointer}
 .catalogo-desplegable>summary::-webkit-details-marker{display:none}
@@ -190,6 +191,11 @@ dialog::backdrop{background:rgba(16,24,40,.5)}
 .campo small{font-weight:400;color:var(--muted)}
 .campo input{font:400 16px var(--fuente-texto);padding:11px 14px;border:1.5px solid var(--linea);border-radius:12px;background:#fff;width:100%}
 .campo input:focus,.filtros input:focus{border-color:var(--primario);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acento) 40%,transparent)}
+.permisos-rol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;min-width:0;margin:0;padding:14px 16px 16px;border:1px solid var(--linea);border-radius:10px}
+.permisos-rol legend{padding:0 6px;color:var(--muted);font-size:13px;font-weight:600}
+.permisos-rol label{display:flex;align-items:flex-start;gap:8px;min-width:0;padding:6px 8px;border-radius:7px;font-size:14px;line-height:1.4;cursor:pointer}
+.permisos-rol label:hover{background:var(--niebla)}
+.permisos-rol input[type=checkbox]{flex:none;width:17px;height:17px;margin:1px 0 0;accent-color:var(--primario)}
 .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .botones{display:flex;justify-content:flex-end;gap:10px;margin-top:4px}
 
@@ -468,11 +474,14 @@ a.link{color:var(--primario)}
   .encabezado{align-items:stretch;gap:12px}
   .encabezado>div{flex:1 1 100%;min-width:0}
   .encabezado-acciones{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .encabezado>.encabezado-acciones{flex:1 1 100%;margin-left:0}
   .encabezado-acciones>.btn{width:100%;min-width:0;white-space:normal}
   .panel{padding:18px 16px;margin-top:14px;border-radius:14px}
   .form{padding:20px 16px}
   .campo,.dos,.tres,.panel,.listo{min-width:0}
   .campo input,.campo select,.campo textarea{min-width:0;max-width:100%}
+  .permisos-rol{grid-template-columns:minmax(0,1fr);gap:4px;padding:10px}
+  .permisos-rol label{padding:7px 6px}
   .botones{min-width:0;flex-wrap:wrap}
   .botones>.btn{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
   .listo{width:100%;padding:22px 16px}
