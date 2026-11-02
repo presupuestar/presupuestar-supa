@@ -26,11 +26,17 @@ El proyecto todavía usa PocketBase en tiempo de ejecución. Esta carpeta contie
 
 ## Variables locales
 
-- La app usará `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en `app/.env.local`.
-- Los scripts de administración usarán `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en un `.env` local ignorado por Git. La clave `service_role` nunca debe llevar el prefijo `VITE_`, compartirse por chat ni publicarse.
+- La app usará `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` en `app/.env.local`.
+- Los scripts de administración usarán `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en `supabase/.env.local`, ignorado por Git. La clave `service_role`/`secret` nunca debe llevar el prefijo `VITE_`, compartirse por chat ni publicarse.
 
 Los archivos `.env`, `.env.*` locales y `migration_data/` están excluidos de Git.
 
 ## Datos de PocketBase
 
-La migración de esquema ya está preparada en `migrations/20261102100000_initial_schema.sql`. Los datos reales todavía no se importaron: hay que conectar el proyecto Supabase, probar una copia de PocketBase y revisar los enlaces de recuperación de las cuentas importadas antes de cambiar la app en producción. Los hashes de contraseña de PocketBase no se pueden reutilizar en Supabase.
+La migración de esquema está en `migrations/20261102100000_initial_schema.sql`. Con PocketBase local ejecutándose y el respaldo de `pb/pb_data` hecho:
+
+1. Ejecutá una vista previa: `cd app; npm run migrate:supabase -- --dry-run`.
+2. Solo si los conteos de destino y origen son correctos, confirmá la transferencia: `npm run migrate:supabase -- --apply`.
+3. Las cuentas migradas reciben contraseñas temporales aleatorias; se guardan en un CSV local dentro de `Documents`. Entregalas de forma privada y pedí a cada usuario que cambie su contraseña. No se pueden reutilizar los hashes de PocketBase.
+
+El importador conserva los datos y archivos originales de PocketBase, verifica que el destino esté vacío antes de empezar y guarda el estado local para poder reanudar una ejecución interrumpida de forma segura.

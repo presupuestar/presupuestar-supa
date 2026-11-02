@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "deploy:pockethost": "npm run build && node scripts/desplegar-pockethost.mjs",
+    "migrate:supabase": "node scripts/migrar-pocketbase-a-supabase.mjs",
     "preview": "vite preview",
     "tipos": "tsc --noEmit",
     "build:pb": "npm run build && node scripts/copiar-a-pb.mjs"
