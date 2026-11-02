@@ -49,6 +49,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
           setEmpresa(null)
           setErrorEmpresa('')
           restablecerTema()
+          setCargando(false)
         }
         return
       }
