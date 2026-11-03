@@ -222,22 +222,18 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     } catch (e) { setError(mensajeError(e, 'No se pudo guardar el ítem en el catálogo.')) }
   }
 
-  const problemas = (estado: 'borrador' | 'pendiente'): string => {
-    if (lineas.length === 0) return 'Agregá al menos un ítem al presupuesto.'
+  const problemas = (): string => {
     if (lineas.some((l) => !lineaValida(l))) return 'Revisá los ítems: cada uno necesita descripción, una cantidad mayor a 0 y un importe de 0 o más.'
     if (new Set(lineas.map((l) => normalizarMoneda(l.moneda))).size > 1) return 'Un presupuesto no puede mezclar precios de distintas monedas.'
-    if (!Number.isFinite(parseImporte(ganancia)) || parseImporte(ganancia) < 0) return 'La ganancia tiene que ser un importe igual o mayor a 0.'
-    if (estado === 'pendiente') {
-      if (pagoOpcion === OTRA_FORMA && !pagoOtra.trim()) return 'Escribí la forma de pago o elegí una de la lista.'
-      if (!nombre.trim()) return 'Falta el nombre completo del cliente.'
-      if (!EMAIL.test(email.trim())) return 'Falta un correo electrónico válido del cliente.'
-      if (!telefono.trim()) return 'Falta el teléfono del cliente.'
-    }
+    const gananciaIngresada = ganancia.trim() ? parseImporte(ganancia) : 0
+    if (!Number.isFinite(gananciaIngresada) || gananciaIngresada < 0) return 'La ganancia tiene que ser un importe igual o mayor a 0.'
+    if (!nombre.trim()) return 'Falta el nombre completo del cliente.'
+    if (email.trim() && !EMAIL.test(email.trim())) return 'El correo electrónico no tiene un formato válido.'
     return ''
   }
 
   const guardar = async (estado: 'borrador' | 'pendiente') => {
-    const p = problemas(estado)
+    const p = problemas()
     if (p) return setError(p)
     setError(''); setGuardando(true)
     try {
@@ -254,7 +250,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
         plazo: plazo.trim(),
         formaPago: pagoOpcion === OTRA_FORMA ? pagoOtra.trim() : pagoOpcion,
         notas: notas.trim(),
-        ganancia: parseImporte(ganancia),
+        ganancia: ganancia.trim() ? parseImporte(ganancia) : 0,
         moneda: monedaPresupuesto,
         cotizacionDolar: cotizacionDolar ?? 0,
         cotizacionFecha,
