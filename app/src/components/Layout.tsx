@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { useSesion } from '../context/Sesion'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { SelloPresupuestar } from './Isotipo'
 import { PrimerAccesoDialog } from './PrimerAccesoDialog'
@@ -23,6 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/catalogo" className={clase}>Catálogo</NavLink>
           <NavLink to="/nuevo" className={clase}>Nuevo presupuesto</NavLink>
           <NavLink to="/historial" className={clase}>Historial</NavLink>
+          {tienePermiso(usuario, 'clients.manage') && <NavLink to="/clientes" className={clase}>Clientes</NavLink>}
           {usuario?.rol === 'admin' && <NavLink to="/equipo" className={clase}>Equipo</NavLink>}
         </nav>
         <span className="usuario">{usuario?.email} <button className="link" onClick={salir}>Salir</button></span>
