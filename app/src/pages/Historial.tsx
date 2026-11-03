@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { GraficoBarras } from '../components/GraficoBarras'
 import { GraficoCircular, type ColorSegmento } from '../components/GraficoCircular'
-import { useSesion } from '../context/Sesion'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
@@ -38,6 +38,8 @@ function SeccionDesplegable({ titulo, children }: { titulo: React.ReactNode; chi
 export function Historial() {
   const { empresa, usuario } = useSesion()
   const esAdmin = usuario?.rol === 'admin'
+  const puedeEliminar = (presupuesto: Presupuesto) =>
+    tienePermiso(usuario, 'quotes.delete_own') && (esAdmin || presupuesto.vendedor === usuario?.id)
   const [lista, setLista] = useState<Presupuesto[] | null>(null)
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -160,7 +162,7 @@ export function Historial() {
   const eliminar = async (p: Presupuesto) => {
     if (!confirm(`¿Eliminar el presupuesto N° ${String(p.numero).padStart(4, '0')}?\n\nEsta acción no se puede deshacer.`)) return
     try { await repositorio.presupuestos.eliminar(p.id); await cargar() }
-    catch (e) { setError(mensajeError(e, 'No se pudo eliminar el borrador.')) }
+    catch (e) { setError(mensajeError(e, 'No se pudo eliminar el presupuesto.')) }
   }
 
   const descargar = async (p: Presupuesto) => {
@@ -295,7 +297,7 @@ export function Historial() {
                     <div className="acciones-historial">
                       <button className="accion-historial" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
                       {sePuedeEditar(p.estado) && <Link className="accion-historial" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
-                      <button className="accion-historial peligro" onClick={() => eliminar(p)}>Eliminar</button>
+                      {puedeEliminar(p) && <button className="accion-historial peligro" onClick={() => eliminar(p)}>Eliminar</button>}
                     </div>
                   </td>
                 </tr>

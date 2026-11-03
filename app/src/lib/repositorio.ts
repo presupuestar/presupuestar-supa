@@ -336,8 +336,9 @@ export const repositorio = {
         .update({ status: estado }).eq('id', id).select('*').single()))
     },
     async eliminar(id: string) {
-      const { error } = await supabase.from('quotes').delete().eq('id', id)
+      const { data, error } = await supabase.from('quotes').delete().eq('id', id).select('id').maybeSingle()
       if (error) throw error
+      if (!data) throw new Error('No se pudo eliminar: no tenés permiso sobre este presupuesto o ya no existe.')
     },
   },
 
