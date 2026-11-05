@@ -83,6 +83,8 @@ const presupuestoDesdeDb = (r: DbRow): Presupuesto => ({
   moneda: String(r.currency ?? 'ARS'),
   cotizacionDolar: Number(r.exchange_rate) || 0,
   cotizacionFecha: String(r.exchange_rate_date ?? ''),
+  cotizacionFuente: String(r.exchange_rate_source ?? ''),
+  vigenteHasta: String(r.valid_until_date ?? ''),
   fechaRespuesta: String(r.answered_at ?? ''),
   created: String(r.created_at ?? ''),
   updated: String(r.updated_at ?? ''),
@@ -120,6 +122,8 @@ const presupuestoAColumna = (d: Partial<Presupuesto>) => ({
   ...(d.moneda !== undefined ? { currency: d.moneda } : {}),
   ...(d.cotizacionDolar !== undefined ? { exchange_rate: d.cotizacionDolar } : {}),
   ...(d.cotizacionFecha !== undefined ? { exchange_rate_date: d.cotizacionFecha } : {}),
+  ...(d.cotizacionFuente !== undefined ? { exchange_rate_source: d.cotizacionFuente } : {}),
+  ...(d.vigenteHasta !== undefined ? { valid_until_date: d.vigenteHasta || null } : {}),
 })
 
 const dinero = (n: number) => Math.round(n * 100) / 100
@@ -297,7 +301,7 @@ export const repositorio = {
 
   clientes: {
     async listar() {
-      return errorResult(await supabase.from('clients').select('*').order('name')).map(clienteDesdeDb)
+      return errorResult(await supabase.from('clients').select('*').is('deleted_at', null).order('name')).map(clienteDesdeDb)
     },
     async crear(d: Omit<Cliente, 'id' | 'empresa'>) {
       const id = await empresaId()
@@ -309,8 +313,18 @@ export const repositorio = {
         .update(clienteAColumna(d)).eq('id', id).select('*').single()))
     },
     async eliminar(id: string) {
-      const { error } = await supabase.from('clients').delete().eq('id', id)
+      const { error } = await supabase.from('clients').update({ deleted_at: new Date().toISOString() }).eq('id', id).is('deleted_at', null)
       if (error) throw error
+    },
+    /** Copia descargable de la cartera y de los presupuestos de la empresa (Ley 25.326). */
+    async exportarPortabilidad() {
+      const clientes = errorResult(await supabase.from('clients').select('id,name,email,phone,document,address,created_at,updated_at').is('deleted_at', null).order('name'))
+      const presupuestos = errorResult(await supabase.from('quotes').select('id,number,status,issue_date,valid_until_date,currency,exchange_rate,exchange_rate_date,exchange_rate_source,client_id,client_snapshot,total,created_at').order('number', { ascending: false }))
+      return {
+        exportedAt: new Date().toISOString(),
+        clients: clientes,
+        quotes: presupuestos,
+      }
     },
   },
 

@@ -3,13 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
-import { formatearImporte, importeEnMoneda, normalizarMoneda, parseCantidad, parseImporte } from '../lib/formato'
+import { fechaCorta, formatearImporte, importeEnMoneda, normalizarMoneda, parseCantidad, parseImporte } from '../lib/formato'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
 import { FORMAS_PAGO, OTRA_FORMA } from '../lib/pagos'
 import { requiereSena } from '../lib/pagos'
 import { mensajeError } from '../lib/errores'
-import { sePuedeEditar } from '../lib/estados'
+import { fechaVigencia, presupuestoCaducado, sePuedeEditar } from '../lib/estados'
 import { convertirUsdAArs, obtenerCotizacionBlue } from '../lib/cotizacion'
+import { FUENTE_COTIZACION_BLUE, LEYENDA_FISCAL } from '../lib/legal'
 import type { Cliente, Item, Presupuesto } from '../lib/tipos'
 
 /** Una línea mientras se edita: los números son texto para poder tipear con coma. */
@@ -78,6 +79,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   })))
   const [cotizacionDolar, setCotizacionDolar] = useState<number | undefined>(inicial?.cotizacionDolar)
   const [cotizacionFecha, setCotizacionFecha] = useState(inicial?.cotizacionFecha ?? '')
+  const [cotizacionFuente, setCotizacionFuente] = useState(inicial?.cotizacionFuente || FUENTE_COTIZACION_BLUE)
   const [consultandoCotizacion, setConsultandoCotizacion] = useState(false)
   const [ajusteGeneral, setAjusteGeneral] = useState('')
   const [ganancia, setGanancia] = useState(formatearImporte(inicial?.ganancia ?? 0))
@@ -172,6 +174,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
         fecha = actual.fecha
         setCotizacionDolar(tasa)
         setCotizacionFecha(fecha)
+        setCotizacionFuente(actual.fuente)
       }
       const precio = convertir ? convertirUsdAArs(it.precio, tasa ?? 0) : it.precio
       setLineas((ls) => [...ls, {
@@ -237,6 +240,21 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     if (p) return setError(p)
     setError(''); setGuardando(true)
     try {
+      let tasa = cotizacionDolar ?? 0
+      let fechaCotizacion = cotizacionFecha
+      let fuenteCotizacion = cotizacionFuente
+      if (monedaPresupuesto !== 'ARS' && (tasa <= 0 || !fechaCotizacion || !fuenteCotizacion)) {
+        const actual = await obtenerCotizacionBlue()
+        tasa = actual.venta
+        fechaCotizacion = actual.fecha
+        fuenteCotizacion = actual.fuente
+        setCotizacionDolar(tasa)
+        setCotizacionFecha(fechaCotizacion)
+        setCotizacionFuente(fuenteCotizacion)
+      }
+      if (tasa > 0 && !fuenteCotizacion) fuenteCotizacion = FUENTE_COTIZACION_BLUE
+      const diasValidez = Number(validez) > 0 ? Math.round(Number(validez)) : 15
+      const fechaEmision = inicial?.fechaEmision || hoy()
       const datos = { nombre: nombre.trim(), email: email.trim(), telefono: telefono.trim(), documento: documento.trim(), direccion: direccion.trim() }
       let clienteId = clienteSel
       // Los clientes guardados exigen los tres datos: solo se actualizan o crean si están completos.
@@ -246,14 +264,16 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
       }
       const campos = {
         estado,
-        validezDias: Number(validez) > 0 ? Math.round(Number(validez)) : 15,
+        validezDias: diasValidez,
+        vigenteHasta: fechaVigencia(fechaEmision, diasValidez),
         plazo: plazo.trim(),
         formaPago: pagoOpcion === OTRA_FORMA ? pagoOtra.trim() : pagoOpcion,
         notas: notas.trim(),
         ganancia: ganancia.trim() ? parseImporte(ganancia) : 0,
         moneda: monedaPresupuesto,
-        cotizacionDolar: cotizacionDolar ?? 0,
-        cotizacionFecha,
+        cotizacionDolar: tasa,
+        cotizacionFecha: fechaCotizacion,
+        cotizacionFuente: tasa > 0 || monedaPresupuesto !== 'ARS' ? fuenteCotizacion : '',
         clienteDatos: datos,
         lineas: lineas.map((l) => ({ itemId: l.itemId, descripcion: l.descripcion.trim(), detalle: l.detalle.trim(), cantidad: parseCantidad(l.cantidad), precioUnitario: parseImporte(l.precio), moneda: normalizarMoneda(l.moneda), ...(l.precioOrigen !== undefined && l.monedaOrigen ? { precioOrigen: l.precioOrigen, monedaOrigen: l.monedaOrigen } : {}) })),
       }
@@ -273,6 +293,9 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   return (
     <main className="contenido ancho presupuesto-edicion">
       <h1>{inicial ? `Editar presupuesto N° ${String(inicial.numero).padStart(4, '0')}` : 'Nuevo presupuesto'}</h1>
+      {inicial && presupuestoCaducado(inicial, empresa?.validezDias) && (
+        <p className="aviso-vigencia" role="alert">Este presupuesto superó su vigencia{inicial.vigenteHasta ? ` (venció el ${fechaCorta(inicial.vigenteHasta)})` : ''}. Revisá importes y condiciones antes de reenviarlo.</p>
+      )}
       <p className="sub">Completá los datos del cliente y sumá los ítems: del catálogo o personalizados, con el importe que necesites.</p>
 
       <datalist id="mayoristas-catalogo">{proveedoresCatalogo.map((p) => <option key={p} value={p} />)}</datalist>
@@ -311,7 +334,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
 
       <section className="panel">
         <h2>Ítems</h2>
-        {cotizacionDolar && <p className="aviso-cotizacion" role="status">Cotización dólar blue venta: <strong>{importeEnMoneda(cotizacionDolar, 'ARS')}</strong> por USD · actualizada {new Date(cotizacionFecha).toLocaleString('es-AR')}. Se conserva esta tasa en el presupuesto.</p>}
+        {cotizacionDolar ? <p className="aviso-cotizacion" role="status">Cotización dólar blue venta: <strong>{importeEnMoneda(cotizacionDolar, 'ARS')}</strong> por USD · fuente {cotizacionFuente || FUENTE_COTIZACION_BLUE} · actualizada {new Date(cotizacionFecha).toLocaleString('es-AR')}. Se conserva esta tasa en el presupuesto.</p> : null}
         {lineas.length === 0
           ? <p className="vacio-linea">Todavía no hay ítems. Agregá uno del catálogo o creá uno personalizado.</p>
           : (
@@ -498,6 +521,8 @@ function Listo({ presupuesto, alNuevo }: { presupuesto: Presupuesto; alNuevo: ()
           <Link className="btn sec chico" to="/">Ir al inicio</Link>
         </div>
         {estado === 'error' && <p className="error" role="alert">No se pudo generar el PDF. El presupuesto está guardado: probá de nuevo.</p>}
+        {presupuestoCaducado(presupuesto) && <p className="aviso-vigencia" role="alert">Este presupuesto superó su fecha de vigencia{presupuesto.vigenteHasta ? ` (${fechaCorta(presupuesto.vigenteHasta)})` : ''}.</p>}
+        <p className="leyenda-fiscal">{LEYENDA_FISCAL}.</p>
       </section>
       {estado === 'ok' && url && (
         <div className="vista-pdf"><iframe src={url} title={`Vista previa del presupuesto N° ${presupuesto.numero}`} /></div>

@@ -30,3 +30,28 @@ export function estaVencido(fechaEmision: string, validezDias?: number, hoy = ne
   const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
   return hoySinHora >= emision
 }
+
+/** Último día inclusive de vigencia: la fecha guardada o emisión + (días − 1). */
+export function fechaVigencia(fechaEmision: string, validezDias?: number, vigenteHasta?: string): string {
+  if (vigenteHasta) return vigenteHasta.slice(0, 10)
+  if (!fechaEmision || !validezDias || validezDias < 1) return ''
+  const emision = new Date(`${fechaEmision.slice(0, 10)}T00:00:00`)
+  if (!Number.isFinite(emision.getTime())) return ''
+  emision.setDate(emision.getDate() + Math.floor(validezDias) - 1)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${emision.getFullYear()}-${p(emision.getMonth() + 1)}-${p(emision.getDate())}`
+}
+
+/** Un pendiente está caducado cuando hoy es posterior a su fecha de vigencia. */
+export function presupuestoCaducado(
+  presupuesto: { estado: Estado; fechaEmision: string; validezDias?: number; vigenteHasta?: string },
+  validezEmpresa?: number,
+  hoy = new Date(),
+): boolean {
+  if (presupuesto.estado !== 'pendiente') return false
+  const limite = fechaVigencia(presupuesto.fechaEmision, presupuesto.validezDias ?? validezEmpresa, presupuesto.vigenteHasta)
+  if (!limite) return estaVencido(presupuesto.fechaEmision, presupuesto.validezDias ?? validezEmpresa, hoy)
+  const fin = new Date(`${limite}T00:00:00`)
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  return hoySinHora > fin
+}

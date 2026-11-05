@@ -56,7 +56,14 @@ Deno.serve(async (request: Request) => {
     const allowed = [
       'name', 'document', 'email', 'phone', 'logo_path', 'title_font_path', 'text_font_path',
       'primary_color', 'accent_color', 'title_font', 'text_font', 'validity_days', 'terms', 'show_seal',
+      'plan_tier', 'status',
     ]
+    if ('plan_tier' in changes && !['inicial', 'profesional', 'empresa'].includes(String(changes.plan_tier))) {
+      return json({ error: 'El plan no es válido.' }, 400)
+    }
+    if ('status' in changes && !['activa', 'suspendida', 'cancelada'].includes(String(changes.status))) {
+      return json({ error: 'El estado de la cuenta no es válido.' }, 400)
+    }
     const safeChanges = Object.fromEntries(Object.entries(changes).filter(([key]) => allowed.includes(key)))
     if (!Object.keys(safeChanges).length) return json({ error: 'No hay campos válidos para actualizar.' }, 400)
     const { data: updated, error } = await adminClient.from('companies').update(safeChanges)

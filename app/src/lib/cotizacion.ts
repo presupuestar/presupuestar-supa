@@ -1,6 +1,9 @@
+import { FUENTE_COTIZACION_BLUE } from './legal'
+
 export interface CotizacionBlue {
   venta: number
   fecha: string
+  fuente: string
 }
 
 let cotizacionCache: { value: CotizacionBlue; expiresAt: number } | null = null
@@ -44,7 +47,7 @@ async function cargarCotizacionBlue(): Promise<CotizacionBlue> {
     if (cotizacion.casa !== 'blue' || cotizacion.moneda !== 'USD' || !Number.isFinite(venta) || venta < 100 || venta > 100_000 || !fecha || !Number.isFinite(Date.parse(fecha))) {
       throw new Error('El servicio devolvió una cotización blue incompleta o inválida.')
     }
-    return { venta, fecha }
+    return { venta, fecha, fuente: FUENTE_COTIZACION_BLUE }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('La consulta del dólar blue tardó demasiado. Verificá tu conexión e intentá de nuevo.')

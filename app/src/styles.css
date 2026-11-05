@@ -54,7 +54,14 @@ h1,h2,h3{font-family:var(--fuente-titulos);color:var(--primario);letter-spacing:
 .resumen dt{font-size:13px;color:var(--muted)}
 .resumen dd{margin:0;font:600 20px var(--fuente-titulos)}
 .ok{color:var(--ok)}.no{color:var(--no)}.pe{color:var(--pe)}
-.pie{text-align:center;padding:30px}
+.pie{text-align:center;padding:30px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.enlaces-legales{margin:0;font-size:13px;color:var(--muted)}
+.texto-legal{display:grid;gap:10px;font-size:14px;line-height:1.45}
+.texto-legal h3{margin:6px 0 0;font-size:15px}
+.texto-legal p{margin:0}
+.ventana.legal{max-width:640px}
+.leyenda-fiscal{margin:12px 0 0;font-size:13px;line-height:1.4;color:#344054}
+.aviso-vigencia{margin:0 0 16px;padding:12px 14px;border-radius:12px;background:#FEECEB;color:#912018;font-size:14px}
 
 @media (max-width:820px){.login{grid-template-columns:1fr}.login-lado{padding:36px 28px}.barra{flex-wrap:wrap;gap:12px}.barra nav{order:3;flex-basis:100%}}
 

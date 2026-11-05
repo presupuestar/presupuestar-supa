@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, Image, Svg, Path, Rect, G, StyleSheet } from '@react-pdf/renderer'
 import { fechaCorta, importeEnMoneda } from '../formato'
-import { estaVencido } from '../estados'
+import { fechaVigencia, presupuestoCaducado } from '../estados'
+import { LEYENDA_FISCAL } from '../legal'
 import { requiereSena } from '../pagos'
 import type { Empresa, Presupuesto } from '../tipos'
 
@@ -30,7 +31,7 @@ function Isotipo({ size }: { size: number }) {
 export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Props) {
   const primario = e.colorPrimario, acento = e.colorAcento
   const s = StyleSheet.create({
-    page: { paddingTop: 44, paddingBottom: 78, paddingHorizontal: 40, fontFamily: fuentes.texto, fontSize: 9.5, color: TINTA },
+    page: { paddingTop: 44, paddingBottom: 92, paddingHorizontal: 40, fontFamily: fuentes.texto, fontSize: 9.5, color: TINTA },
     barra: { position: 'absolute', top: 0, left: 0, right: 0, height: 8, backgroundColor: primario },
     cab: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 14, borderBottomWidth: 0.75, borderBottomColor: LINEA },
     marca: { flexDirection: 'column', alignItems: 'flex-start', width: 160 },
@@ -68,7 +69,9 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
     totalVal: { fontFamily: fuentes.titulos, fontWeight: 700, fontSize: 15, color: primario },
     sena: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, fontSize: 8.5, color: MUTED },
     acentoLinea: { height: 2, width: 36, backgroundColor: acento, marginTop: 8 },
-    pie: { position: 'absolute', bottom: 28, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 0.75, borderTopColor: LINEA, paddingTop: 8, fontSize: 7.5, color: MUTED },
+    pie: { position: 'absolute', bottom: 22, left: 40, right: 40, borderTopWidth: 0.75, borderTopColor: LINEA, paddingTop: 6, fontSize: 7.5, color: MUTED },
+    pieFila: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    leyenda: { marginTop: 3, fontSize: 6.5, lineHeight: 1.25, color: '#344054' },
     sello: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     contPag: { fontSize: 8, color: MUTED, marginBottom: 10 },
   })
@@ -81,7 +84,8 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
 
   const lineas = p.lineas ?? []
   const validez = p.validezDias ?? e.validezDias
-  const vencido = p.estado === 'pendiente' && estaVencido(p.fechaEmision, validez)
+  const vigenteHasta = fechaVigencia(p.fechaEmision, validez, p.vigenteHasta)
+  const vencido = presupuestoCaducado(p, e.validezDias)
   const condiciones = e.condiciones || (validez ? `Validez del presupuesto: ${validez} días.` : '')
   const cl = p.clienteDatos ?? { nombre: '', email: '', telefono: '', documento: '', direccion: '' }
 
@@ -119,6 +123,7 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
             <Text style={s.meta}>N° {num4(p.numero)}</Text>
             <Text style={s.meta}>Fecha: {fechaCorta(p.fechaEmision)}</Text>
             {validez ? <Text style={s.meta}>Validez: {validez} días</Text> : null}
+            {vigenteHasta ? <Text style={s.meta}>Vigente hasta: {fechaCorta(vigenteHasta)}</Text> : null}
             {p.plazo ? <Text style={s.meta}>Plazo: {p.plazo}</Text> : null}
             {p.estado === 'borrador' && <Text style={s.borrador}>BORRADOR</Text>}
             {vencido && <Text style={s.borrador}>CADUCADO</Text>}
@@ -156,7 +161,7 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
             {p.formaPago ? (
               <Text style={s.condTxt}><Text style={{ fontWeight: 700, color: TINTA }}>Forma de pago: </Text>{p.formaPago}</Text>
             ) : null}
-            {p.cotizacionDolar ? <Text style={{ ...s.condTxt, marginTop: 4 }}>Conversión dólar blue venta: {importeEnMoneda(p.cotizacionDolar, 'ARS')} por USD · cotización del {fechaCorta(p.cotizacionFecha || p.fechaEmision)}.</Text> : null}
+            {p.cotizacionDolar ? <Text style={{ ...s.condTxt, marginTop: 4 }}>Tipo de cambio: {importeEnMoneda(p.cotizacionDolar, 'ARS')} por USD · fuente: {p.cotizacionFuente || 'dolarapi.com · dólar blue venta'} · {fechaCorta(p.cotizacionFecha || p.fechaEmision)}.</Text> : null}
             {condiciones !== '' && <Text style={{ ...s.condTxt, marginTop: p.formaPago ? 4 : 0 }}>{condiciones}</Text>}
             {p.notas ? (<><Text style={{ ...s.condTit, marginTop: 8 }}>Notas</Text><Text style={s.condTxt}>{p.notas}</Text></>) : null}
           </View>
@@ -171,11 +176,14 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
         </View>
 
         <View fixed style={s.pie}>
-          <Text>{[e.nombre, e.email].filter(Boolean).join('  ·  ')}</Text>
-          {e.mostrarSello !== false && (
-            <View style={s.sello}><Isotipo size={11} /><Text>Hecho con PresupuestAR</Text></View>
-          )}
-          <Text render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
+          <View style={s.pieFila}>
+            <Text>{[e.nombre, e.email].filter(Boolean).join('  ·  ')}</Text>
+            {e.mostrarSello !== false && (
+              <View style={s.sello}><Isotipo size={11} /><Text>Hecho con PresupuestAR</Text></View>
+            )}
+            <Text render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
+          </View>
+          <Text style={s.leyenda}>{LEYENDA_FISCAL}.</Text>
         </View>
       </Page>
     </Document>

@@ -4,6 +4,7 @@ import { tienePermiso, useSesion } from '../context/Sesion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { SelloPresupuestar } from './Isotipo'
 import { PrimerAccesoDialog } from './PrimerAccesoDialog'
+import { EnlacesLegales } from './EnlacesLegales'
 
 const clase = ({ isActive }: { isActive: boolean }) => (isActive ? 'activo' : '')
 
@@ -30,7 +31,10 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
       {children}
       <PrimerAccesoDialog />
-      {empresa?.mostrarSello !== false && <footer className="pie"><SelloPresupuestar /></footer>}
+      <footer className="pie">
+        {empresa?.mostrarSello !== false && <SelloPresupuestar />}
+        <EnlacesLegales />
+      </footer>
     </div>
   )
 }

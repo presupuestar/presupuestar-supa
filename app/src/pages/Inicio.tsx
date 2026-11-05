@@ -6,6 +6,7 @@ import { GraficoCircular, type ColorSegmento } from '../components/GraficoCircul
 import { GraficoBarras } from '../components/GraficoBarras'
 import { importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
+import { presupuestoCaducado } from '../lib/estados'
 import { repositorio } from '../lib/repositorio'
 import type { ResumenMes } from '../lib/tipos'
 
@@ -15,15 +16,19 @@ const nombreMes = (aaaamm: string) =>
 export function Inicio() {
   const { empresa, usuario } = useSesion()
   const [meses, setMeses] = useState<ResumenMes[]>([])
+  const [caducados, setCaducados] = useState(0)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) {
       repositorio.presupuestos.listar()
-        .then((l) => setMeses(repositorio.resumenMensual(l)))
+        .then((l) => {
+          setMeses(repositorio.resumenMensual(l))
+          setCaducados(l.filter((p) => presupuestoCaducado(p, empresa?.validezDias)).length)
+        })
         .catch((e) => setError(mensajeError(e, 'No se pudo cargar el resumen de presupuestos.')))
     }
-  }, [usuario])
+  }, [usuario, empresa?.validezDias])
 
   const mes = meses[0]
   const resumenMes = mes ? meses.filter((m) => m.mes === mes.mes) : []
@@ -54,6 +59,12 @@ export function Inicio() {
           </div>
           {tienePermiso(usuario, 'quotes.create') && <Link className="btn chico" to="/nuevo">Nuevo presupuesto</Link>}
         </div>
+        {caducados > 0 && (
+          <p className="aviso-vigencia" role="alert">
+            {caducados === 1 ? 'Hay 1 presupuesto pendiente que superó su fecha de vigencia.' : `Hay ${caducados} presupuestos pendientes que superaron su fecha de vigencia.`}
+            {' '}<Link className="link" to="/historial">Revisarlos en el historial</Link>
+          </p>
+        )}
 
         {mes && (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && (
           <section className="resumen">

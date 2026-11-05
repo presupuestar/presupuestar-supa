@@ -92,6 +92,10 @@ export interface Presupuesto {
   moneda?: string
   cotizacionDolar?: number
   cotizacionFecha?: string
+  /** Origen de la tasa (obligatorio si la moneda no es ARS o hay conversión). */
+  cotizacionFuente?: string
+  /** Último día inclusive de vigencia comercial. */
+  vigenteHasta?: string
   fechaRespuesta?: string
   created: string
   updated: string

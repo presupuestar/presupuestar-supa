@@ -6,11 +6,10 @@ import { Isotipo } from '../components/Isotipo'
 import { VolverArriba } from '../components/PreferenciasVisuales'
 import { generarClave } from '../lib/clave'
 import { mensajeError } from '../lib/errores'
-import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
+import { fechaCorta } from '../lib/formato'
 import { supabasePropietario as supabase } from '../lib/supabase'
-import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import type { Empresa as EmpresaApp, Estado, Linea, Presupuesto } from '../lib/tipos'
+import { EnlacesLegales } from '../components/EnlacesLegales'
 
 interface Company {
   id: string
@@ -28,13 +27,16 @@ interface Company {
   validity_days: number | null
   terms: string | null
   show_seal: boolean
+  plan_tier?: string
+  status?: string
+  storage_usage_bytes?: number
 }
 
 interface CompanyRow extends Pick<Company, 'id' | 'name' | 'email' | 'primary_color'> {
   users: number
-  items: number
-  clients: number
-  quotes: number
+  plan_tier: string
+  status: string
+  storage_usage_bytes: number
 }
 
 interface UserRow {
@@ -45,10 +47,9 @@ interface UserRow {
   created_at: string
 }
 
-type Tab = 'datos' | 'usuarios' | 'clientes' | 'items' | 'presupuestos'
+type Tab = 'datos' | 'usuarios'
 const tabs: [Tab, string][] = [
-  ['datos', 'Datos y marca'], ['usuarios', 'Usuarios'], ['clientes', 'Clientes'],
-  ['items', 'Ítems'], ['presupuestos', 'Presupuestos'],
+  ['datos', 'Datos y marca'], ['usuarios', 'Usuarios'],
 ]
 
 async function platformAction(body: Record<string, unknown>) {
@@ -149,36 +150,34 @@ export function PropietarioSupabase() {
   }, [confirmDelete])
 
   const loadCompanies = async () => {
-    const [companyResult, profileResult, itemResult, clientResult, quoteResult] = await Promise.all([
-      supabase.from('companies').select('id,name,email,primary_color').order('name'),
-      supabase.from('profiles').select('company_id'),
-      supabase.from('items').select('company_id'),
-      supabase.from('clients').select('company_id'),
-      supabase.from('quotes').select('company_id'),
-    ])
-    for (const result of [companyResult, profileResult, itemResult, clientResult, quoteResult]) {
-      if (result.error) throw result.error
+    const directory = await supabase.rpc('platform_company_directory')
+    const profileResult = await supabase.from('profiles').select('company_id')
+    if (profileResult.error) throw profileResult.error
+    const users = new Map<string, number>()
+    for (const row of profileResult.data ?? []) {
+      if (row.company_id) users.set(row.company_id, (users.get(row.company_id) ?? 0) + 1)
     }
-    if (!companyResult.data || !profileResult.data || !itemResult.data || !clientResult.data || !quoteResult.data) {
-      throw new Error('Supabase no devolvió todos los datos del panel.')
+    if (!directory.error && directory.data) {
+      setCompanies(directory.data.map((row: { id: string; name: string; email: string | null; primary_color: string; plan_tier: string; status: string; storage_usage_bytes: number }) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        primary_color: row.primary_color,
+        plan_tier: row.plan_tier,
+        status: row.status,
+        storage_usage_bytes: Number(row.storage_usage_bytes) || 0,
+        users: users.get(row.id) ?? 0,
+      })))
+      return
     }
-    const countByCompany = (rows: { company_id: string | null }[]) => {
-      const counts = new Map<string, number>()
-      rows.forEach(({ company_id }) => {
-        if (company_id) counts.set(company_id, (counts.get(company_id) ?? 0) + 1)
-      })
-      return counts
-    }
-    const profiles = countByCompany(profileResult.data)
-    const items = countByCompany(itemResult.data)
-    const clients = countByCompany(clientResult.data)
-    const quotes = countByCompany(quoteResult.data)
-    setCompanies(companyResult.data.map((row) => ({
+    const companyResult = await supabase.from('companies').select('id,name,email,primary_color').order('name')
+    if (companyResult.error) throw companyResult.error
+    setCompanies((companyResult.data ?? []).map((row) => ({
       ...row,
-      users: profiles.get(row.id) ?? 0,
-      items: items.get(row.id) ?? 0,
-      clients: clients.get(row.id) ?? 0,
-      quotes: quotes.get(row.id) ?? 0,
+      plan_tier: 'inicial',
+      status: 'activa',
+      storage_usage_bytes: 0,
+      users: users.get(row.id) ?? 0,
     })))
   }
 
@@ -264,6 +263,7 @@ export function PropietarioSupabase() {
             <Link className="link" to="/recuperar?owner=1">¿Olvidaste tu contraseña?</Link>
             {error && <p className="error" role="alert">{error}</p>}
             <button className="btn">Ingresar</button>
+            <EnlacesLegales />
           </form>
         </section>
       </main>
@@ -289,27 +289,27 @@ export function PropietarioSupabase() {
           {error && <p className="error" role="alert">{error}</p>}
           {tab === 'datos' && <CompanySettings company={company} saveCompany={setCompany} onError={setError} onDelete={() => setConfirmDelete(true)} />}
           {tab === 'usuarios' && <CompanyUsers companyId={company.id} onError={setError} />}
-          {tab === 'clientes' && <CompanyTable key={tab} table="clients" companyId={company.id} onError={setError} />}
-          {tab === 'items' && <CompanyTable key={tab} table="items" companyId={company.id} onError={setError} />}
-          {tab === 'presupuestos' && <CompanyQuotes companyId={company.id} company={company} onError={setError} />}
         </main>
       ) : id ? (
         <main className="contenido ancho">{error ? <p className="error" role="alert">{error}</p> : <p className="sub">Cargando empresa…</p>}</main>
       ) : (
         <main className="contenido ancho">
           <div className="encabezado">
-            <div><h1>Empresas</h1><p className="sub">Empresas y datos administrados en Supabase.</p></div>
+            <div><h1>Empresas</h1><p className="sub">Cuentas del servicio. Este panel no muestra presupuestos, clientes ni catálogos.</p></div>
             <button className="btn chico" onClick={() => setShowCreate(true)}>Nueva empresa</button>
           </div>
           {error && <p className="error" role="alert">{error}</p>}
           <div className="tabla-caja"><table className="tabla">
-            <thead><tr><th>Empresa</th><th className="num">Usuarios</th><th className="num">Clientes</th><th className="num">Ítems</th><th className="num">Presupuestos</th><th /></tr></thead>
+            <thead><tr><th>Empresa</th><th>Plan</th><th>Estado</th><th className="num">Usuarios</th><th className="num">Almacenamiento</th><th /></tr></thead>
             <tbody>
               {companies === null && <tr><td colSpan={6} className="vacio">Cargando…</td></tr>}
               {companies?.length === 0 && <tr><td colSpan={6} className="vacio">No hay empresas.</td></tr>}
               {companies?.map((row) => <tr key={row.id}>
                 <td><span className="punto" style={{ background: row.primary_color }} /> <strong>{row.name}</strong><small>{row.email || 'sin correo de contacto'}</small></td>
-                <td className="num">{row.users}</td><td className="num">{row.clients}</td><td className="num">{row.items}</td><td className="num">{row.quotes}</td>
+                <td>{etiquetaPlan(row.plan_tier)}</td>
+                <td>{etiquetaEstadoCuenta(row.status)}</td>
+                <td className="num">{row.users}</td>
+                <td className="num">{formatearBytes(row.storage_usage_bytes)}</td>
                 <td><Link className="link" to={`/propietario/empresas/${row.id}`}>Abrir y editar</Link></td>
               </tr>)}
             </tbody>
@@ -368,6 +368,7 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
         primary_color: form.primary_color, accent_color: form.accent_color,
         title_font: form.title_font || null, text_font: form.text_font || null,
         validity_days: form.validity_days || 15, terms: form.terms || null, show_seal: form.show_seal,
+        ...('plan_tier' in company ? { plan_tier: form.plan_tier || 'inicial', status: form.status || 'activa' } : {}),
       }
       const assets: [File | null, string, string][] = [
         [logo, 'logo', 'logo_path'],
@@ -399,6 +400,11 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
       <label className="campo">Teléfono<input value={form.phone ?? ''} onChange={(e) => change('phone', e.target.value)} /></label>
       <label className="campo">Correo de contacto<input type="email" value={form.email ?? ''} onChange={(e) => change('email', e.target.value)} /></label>
       <label className="campo">Validez predeterminada (días)<input type="number" min={1} value={form.validity_days ?? 15} onChange={(e) => change('validity_days', Number(e.target.value))} /></label>
+      {'plan_tier' in company && <>
+        <label className="campo">Plan<select value={form.plan_tier ?? 'inicial'} onChange={(e) => change('plan_tier', e.target.value)}><option value="inicial">Inicial</option><option value="profesional">Profesional</option><option value="empresa">Empresa</option></select></label>
+        <label className="campo">Estado de la cuenta<select value={form.status ?? 'activa'} onChange={(e) => change('status', e.target.value)}><option value="activa">Activa</option><option value="suspendida">Suspendida</option><option value="cancelada">Cancelada</option></select></label>
+        <p className="campo">Almacenamiento de marca<small>{formatearBytes(Number(form.storage_usage_bytes) || 0)}. No incluye presupuestos ni archivos de clientes.</small></p>
+      </>}
       <label className="campo"><span>Sello</span><input type="checkbox" checked={form.show_seal} onChange={(e) => change('show_seal', e.target.checked)} /> Mostrar sello PresupuestAR</label>
     </div>
     <label className="campo">Condiciones generales<textarea rows={3} value={form.terms ?? ''} onChange={(e) => change('terms', e.target.value)} /></label>
@@ -474,162 +480,23 @@ function CompanyUsers({ companyId, onError }: { companyId: string; onError: (mes
   </>
 }
 
-type TableName = 'clients' | 'items' | 'quotes'
-const tableColumns: Record<TableName, string> = {
-  clients: 'name,email,phone,document,address',
-  items: 'name,supplier,unit,price,currency,active',
-  quotes: 'number,issue_date,client_snapshot,seller_name,total,currency,status',
-}
-const tableHeaders: Record<TableName, string[]> = {
-  clients: ['Nombre completo', 'Correo electrónico', 'Teléfono', 'Documento', 'Dirección'],
-  items: ['Ítem', 'Proveedor', 'Unidad', 'Precio', 'Estado'],
-  quotes: ['N°', 'Fecha', 'Cliente', 'Vendedor', 'Total', 'Estado'],
+function etiquetaPlan(plan: string) {
+  if (plan === 'profesional') return 'Profesional'
+  if (plan === 'empresa') return 'Empresa'
+  return 'Inicial'
 }
 
-function CompanyTable({ table, companyId, onError }: { table: TableName; companyId: string; onError: (message: string) => void }) {
-  const [rows, setRows] = useState<Record<string, unknown>[] | null>(null)
-  const [page, setPage] = useState(0)
-  const [count, setCount] = useState(0)
-  useEffect(() => {
-    setRows(null)
-    supabase.from(table).select(tableColumns[table], { count: 'exact' }).eq('company_id', companyId)
-      .order(table === 'quotes' ? 'number' : 'name', { ascending: table !== 'quotes' })
-      .range(page * 100, page * 100 + 99)
-      .then(({ data, error }) => {
-        if (error) onError(mensajeError(error, 'No se pudieron cargar los datos.'))
-        else {
-          setRows(data as unknown as Record<string, unknown>[])
-          setCount(count ?? 0)
-        }
-      })
-  }, [table, companyId, page])
-  const cells = (row: Record<string, unknown>): ReactNode[] => {
-    if (table === 'clients') return [text(row.name), text(row.email), text(row.phone), text(row.document) || '—', text(row.address) || '—']
-    if (table === 'items') return [
-      text(row.name), text(row.supplier) || '—', text(row.unit) || '—',
-      importeEnMoneda(Number(row.price), text(row.currency) || 'ARS'), row.active ? 'Activo' : 'Desactivado',
-    ]
-    const snapshot = row.client_snapshot as { nombre?: string } | null
-    return [
-      String(row.number).padStart(4, '0'), row.issue_date ? fechaCorta(String(row.issue_date)) : '—',
-      snapshot?.nombre || 'Sin completar', text(row.seller_name) || '—',
-      importeEnMoneda(Number(row.total), text(row.currency) || 'ARS'), text(row.status),
-    ]
-  }
-  return <>
-    <Table headers={tableHeaders[table]} empty="No hay registros." rows={rows?.map(cells) ?? null} />
-    {count > 100 && <div className="botones">
-      <button className="btn sec chico" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Anterior</button>
-      <span className="ayuda">Página {page + 1} de {Math.ceil(count / 100)}</span>
-      <button className="btn sec chico" disabled={(page + 1) * 100 >= count} onClick={() => setPage((current) => current + 1)}>Siguiente</button>
-    </div>}
-  </>
+function etiquetaEstadoCuenta(status: string) {
+  if (status === 'suspendida') return 'Suspendida'
+  if (status === 'cancelada') return 'Cancelada'
+  return 'Activa'
 }
 
-function CompanyQuotes({ companyId, company, onError }: { companyId: string; company: Company; onError: (message: string) => void }) {
-  const [rows, setRows] = useState<Presupuesto[] | null>(null)
-  const [summary, setSummary] = useState<{ mes: string; moneda: string; cantidad: number; presupuestado: number; aceptado: number; aceptados: number }[]>([])
-  const [page, setPage] = useState(0)
-  const [count, setCount] = useState(0)
-  const [generating, setGenerating] = useState<string | null>(null)
-  useEffect(() => {
-    setRows(null)
-    supabase.from('quotes').select('*', { count: 'exact' }).eq('company_id', companyId)
-      .order('number', { ascending: false }).range(page * 100, page * 100 + 99)
-      .then(({ data, count: total, error }) => {
-        if (error) onError(mensajeError(error, 'No se pudieron cargar los presupuestos.'))
-        else {
-          setCount(total ?? 0)
-          setRows((data ?? []).map((r) => ({
-            id: r.id, empresa: r.company_id, numero: r.number, estado: r.status as Estado,
-            fechaEmision: r.issue_date ?? '', validezDias: r.validity_days ?? undefined,
-            plazo: r.delivery_time, formaPago: r.payment_terms, notas: r.notes, ganancia: Number(r.profit),
-            cliente: r.client_id ?? undefined, clienteDatos: r.client_snapshot as Presupuesto['clienteDatos'],
-            lineas: r.lines as Linea[], vendedor: r.seller_id ?? undefined, vendedorNombre: r.seller_name,
-            vendedorEmail: r.seller_email, total: Number(r.total), moneda: r.currency,
-            cotizacionDolar: Number(r.exchange_rate), cotizacionFecha: r.exchange_rate_date,
-            fechaRespuesta: r.answered_at ?? undefined, created: r.created_at, updated: r.updated_at,
-          })))
-        }
-      })
-  }, [companyId, page])
-  useEffect(() => {
-    const loadSummary = async () => {
-      const byMonth = new Map<string, { mes: string; moneda: string; cantidad: number; presupuestado: number; aceptado: number; aceptados: number }>()
-      for (let from = 0; ; from += 1000) {
-        const { data, error } = await supabase.from('quotes')
-          .select('status,issue_date,created_at,total,currency')
-          .eq('company_id', companyId).range(from, from + 999)
-        if (error) throw error
-        for (const quote of data) {
-          if (quote.status === 'borrador') continue
-          const mes = (quote.issue_date || quote.created_at).slice(0, 7)
-          const moneda = normalizarMoneda(quote.currency)
-          const key = `${mes}\0${moneda}`
-          const current = byMonth.get(key) ?? { mes, moneda, cantidad: 0, presupuestado: 0, aceptado: 0, aceptados: 0 }
-          current.cantidad++
-          current.presupuestado += Number(quote.total)
-          if (quote.status === 'aceptado') {
-            current.aceptado += Number(quote.total)
-            current.aceptados++
-          }
-          byMonth.set(key, current)
-        }
-        if (data.length < 1000) break
-      }
-      setSummary([...byMonth.values()].sort((a, b) => b.mes.localeCompare(a.mes) || a.moneda.localeCompare(b.moneda)))
-    }
-    loadSummary().catch((e: unknown) => onError(mensajeError(e, 'No se pudo calcular el resumen de presupuestos.')))
-  }, [companyId])
-
-  const descargar = async (quote: Presupuesto) => {
-    setGenerating(quote.id); onError('')
-    try {
-      const empresa: EmpresaApp = {
-        id: company.id, nombre: company.name, documento: company.document ?? undefined,
-        email: company.email ?? undefined, telefono: company.phone ?? undefined, logo: company.logo_path ?? undefined,
-        fuenteTitulosArchivo: company.title_font_path ?? undefined, fuenteTextoArchivo: company.text_font_path ?? undefined,
-        colorPrimario: company.primary_color, colorAcento: company.accent_color,
-        fuenteTitulos: company.title_font ?? undefined, fuenteTexto: company.text_font ?? undefined,
-        validezDias: company.validity_days ?? undefined, condiciones: company.terms ?? undefined, mostrarSello: company.show_seal,
-      }
-      const blob = await generarPdf(quote, empresa)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = nombreArchivo(quote); document.body.appendChild(a); a.click(); a.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 15000)
-    } catch (e) { onError(mensajeError(e, 'No se pudo generar el PDF.')) }
-    finally { setGenerating(null) }
-  }
-  const latestMonth = summary[0]?.mes
-  const latestSummary = summary.filter((row) => row.mes === latestMonth)
-  const monthLabel = latestMonth
-    ? new Date(`${latestMonth}-15`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
-    : ''
-
-  return <>
-    {latestSummary.map((row) => <p className="ayuda" key={`${row.mes}-${row.moneda}`}>
-      Último mes con actividad: <strong>{monthLabel} ({row.moneda})</strong> · {row.cantidad} presupuestos · presupuestado {importeEnMoneda(row.presupuestado, row.moneda)} · aceptado {importeEnMoneda(row.aceptado, row.moneda)} · conversión {Math.round((1000 * row.aceptados) / row.cantidad) / 10}%
-    </p>)}
-    <Table headers={['N°', 'Fecha', 'Cliente', 'Vendedor', 'Total', 'Estado', '']} empty="Esta empresa no tiene presupuestos." rows={rows?.map((row) => [
-      String(row.numero).padStart(4, '0'),
-      fechaCorta(row.fechaEmision || row.created),
-      row.clienteDatos?.nombre || 'Sin completar',
-      row.vendedorNombre || '—',
-      importeEnMoneda(row.total, row.moneda),
-      row.estado,
-      <button className="link" disabled={generating === row.id} onClick={() => void descargar(row)}>{generating === row.id ? 'Generando…' : 'PDF'}</button>,
-    ]) ?? null} />
-    {count > 100 && <div className="botones">
-      <button className="btn sec chico" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Anterior</button>
-      <span className="ayuda">Página {page + 1} de {Math.ceil(count / 100)}</span>
-      <button className="btn sec chico" disabled={(page + 1) * 100 >= count} onClick={() => setPage((current) => current + 1)}>Siguiente</button>
-    </div>}
-  </>
-}
-
-function text(value: unknown): string {
-  return value == null ? '' : String(value)
+function formatearBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function Table({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][] | null; empty: string }) {

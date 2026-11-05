@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useSesion } from '../context/Sesion'
 import { Isotipo } from '../components/Isotipo'
+import { EnlacesLegales } from '../components/EnlacesLegales'
 
 export function Login() {
   const { usuario, entrar } = useSesion()
@@ -40,6 +41,7 @@ export function Login() {
           <Link className="link" to="/recuperar">¿Olvidaste tu contraseña?</Link>
           {error && <p className="error" role="alert">{error}</p>}
           <button className="btn" disabled={enviando}>{enviando ? 'Ingresando…' : 'Ingresar'}</button>
+          <EnlacesLegales />
         </form>
       </section>
     </main>

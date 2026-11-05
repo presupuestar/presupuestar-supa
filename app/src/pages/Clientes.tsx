@@ -7,7 +7,7 @@ import { fechaCorta, importeEnMoneda } from '../lib/formato'
 import { repositorio } from '../lib/repositorio'
 import { supabase } from '../lib/supabase'
 import type { Cliente, Estado, Presupuesto } from '../lib/tipos'
-import { ETIQUETA } from '../lib/estados'
+import { ETIQUETA, fechaVigencia, presupuestoCaducado } from '../lib/estados'
 
 const pageSize = 25
 const blankClient: Omit<Cliente, 'id' | 'empresa'> = {
@@ -25,6 +25,7 @@ export function Clientes() {
   const [quotePage, setQuotePage] = useState(0)
   const [quoteCount, setQuoteCount] = useState(0)
   const [error, setError] = useState('')
+  const [exportando, setExportando] = useState(false)
 
   const loadClients = async () => {
     const data = await repositorio.clientes.listar()
@@ -66,6 +67,7 @@ export function Clientes() {
             lineas: r.lines as Presupuesto['lineas'], vendedor: r.seller_id ?? undefined,
             vendedorNombre: r.seller_name, vendedorEmail: r.seller_email, total: Number(r.total),
             moneda: r.currency, cotizacionDolar: Number(r.exchange_rate), cotizacionFecha: r.exchange_rate_date,
+            cotizacionFuente: r.exchange_rate_source, vigenteHasta: r.valid_until_date ?? '',
             fechaRespuesta: r.answered_at ?? undefined, created: r.created_at, updated: r.updated_at,
           })))
         }
@@ -86,8 +88,29 @@ export function Clientes() {
       `${client.nombre} ${client.email} ${client.telefono} ${client.documento ?? ''}`.toLocaleLowerCase().includes(term))
   }, [clients, search])
 
+  const exportar = async () => {
+    setExportando(true)
+    setError('')
+    try {
+      const data = await repositorio.clientes.exportarPortabilidad()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `presupuestar-datos-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 15000)
+    } catch (e) {
+      setError(mensajeError(e, 'No se pudo exportar la cartera.'))
+    } finally {
+      setExportando(false)
+    }
+  }
+
   const remove = async (client: Cliente) => {
-    if (!confirm(`¿Eliminar a ${client.nombre} de tus clientes? Los presupuestos existentes conservarán la copia de los datos.`)) return
+    if (!confirm(`¿Suprimir a ${client.nombre}? Deja de verse en la cartera y no se puede usar en presupuestos nuevos. Los presupuestos ya emitidos conservan su copia y el vínculo histórico.`)) return
     setError('')
     try {
       await repositorio.clientes.eliminar(client.id)
@@ -122,7 +145,7 @@ export function Clientes() {
             <td>{fechaCorta(quote.fechaEmision || quote.created)}</td>
             <td>{quote.vendedorNombre || '—'}</td>
             <td>{importeEnMoneda(quote.total, quote.moneda)}</td>
-            <td>{ETIQUETA[quote.estado]}</td>
+            <td>{presupuestoCaducado(quote) ? <span className="pill caducado">Caducado · venció el {fechaCorta(fechaVigencia(quote.fechaEmision, quote.validezDias, quote.vigenteHasta))}</span> : ETIQUETA[quote.estado]}</td>
             <td>{(usuario?.rol === 'admin' || (tienePermiso(usuario, 'quotes.update_own') && quote.vendedor === usuario?.id))
               && (quote.estado === 'borrador' || quote.estado === 'pendiente' || quote.estado === 'aceptado')
               ? <Link className="link" to={`/presupuestos/${quote.id}/editar`}>Editar</Link>
@@ -148,7 +171,10 @@ export function Clientes() {
   return <Layout><main className="contenido ancho">
     <div className="encabezado">
       <div><h1>Clientes</h1><p className="sub">Guardá los datos de contacto y consultá el historial de presupuestos por cliente.</p></div>
-      <button className="btn chico" onClick={() => setEditing('new')}>Nuevo cliente</button>
+      <div className="encabezado-acciones">
+        <button className="btn sec chico" disabled={exportando || clients === null} onClick={() => void exportar()}>{exportando ? 'Exportando…' : 'Exportar datos'}</button>
+        <button className="btn chico" onClick={() => setEditing('new')}>Nuevo cliente</button>
+      </div>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     <div className="filtros"><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, correo o teléfono…" aria-label="Buscar clientes" /></div>

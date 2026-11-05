@@ -7,7 +7,7 @@ import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
-import { ETIQUETA, estaVencido, opcionesEstado, sePuedeEditar } from '../lib/estados'
+import { ETIQUETA, fechaVigencia, opcionesEstado, presupuestoCaducado, sePuedeEditar } from '../lib/estados'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
 import type { Estado, Presupuesto } from '../lib/tipos'
 
@@ -129,7 +129,7 @@ export function Historial() {
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     return (lista ?? []).filter((p) => {
-      const caducado = p.estado === 'pendiente' && estaVencido(p.fechaEmision, p.validezDias ?? empresa?.validezDias, ahora)
+      const caducado = presupuestoCaducado(p, empresa?.validezDias, ahora)
       if (estado === 'caducado' ? !caducado : estado !== 'todos' && p.estado !== estado) return false
       if (mes && mesDe(p) !== mes) return false
       if (vendedor !== 'todos' && (p.vendedorEmail || '') !== vendedor) return false
@@ -283,8 +283,8 @@ export function Historial() {
                   <td className="campo-vendedor" data-label="Vendedor">{p.vendedorNombre || <span className="sin-dato">Sin asignar</span>}</td>
                   <td className="campo-total num" data-label="Total">{importeEnMoneda(p.total, p.moneda)}</td>
                   <td className="campo-estado" data-label="Estado">
-                    {p.estado === 'pendiente' && estaVencido(p.fechaEmision, p.validezDias ?? empresa?.validezDias, ahora)
-                      ? <><span className="pill caducado" aria-label={`Presupuesto ${p.numero} caducado`}>Caducado</span><select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Cambiar estado del presupuesto ${p.numero}`}
+                    {presupuestoCaducado(p, empresa?.validezDias, ahora)
+                      ? <><span className="pill caducado" aria-label={`Presupuesto ${p.numero} caducado`}>Caducado · venció el {fechaCorta(fechaVigencia(p.fechaEmision, p.validezDias ?? empresa?.validezDias, p.vigenteHasta))}</span><select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Cambiar estado del presupuesto ${p.numero}`}
                         onChange={(e) => cambiarEstado(p, e.target.value as Estado)}>
                         {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
                       </select></>
