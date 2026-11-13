@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { normalizarMoneda } from './formato'
+import { errorDeFuncion } from './errores'
 import { PERMISOS_EMPRESA, type Cliente, type Empresa, type Estado, type Item, type Linea, type PermisoEmpresa, type Presupuesto, type ResumenMes, type ResumenVendedor, type RolEmpresa, type UsuarioEquipo } from './tipos'
 
 type DbRow = Record<string, unknown>
@@ -128,9 +129,25 @@ const presupuestoAColumna = (d: Partial<Presupuesto>) => ({
 
 const dinero = (n: number) => Math.round(n * 100) / 100
 const escaparLike = (value: string) => value.replace(/[\\%_,]/g, '\\$&').replace(/"/g, '\\"')
-const permisosMiembro = PERMISOS_EMPRESA
-  .map(({ codigo }) => codigo)
-  .filter((codigo) => codigo !== 'quotes.view_all') as PermisoEmpresa[]
+/** «Ver presupuestos de todo el equipo» es exclusivo del administrador. */
+const sinVerTodo = (permisos: PermisoEmpresa[]) => permisos.filter((codigo) => codigo !== 'quotes.view_all')
+const permisosMiembro: PermisoEmpresa[] = sinVerTodo(PERMISOS_EMPRESA.map(({ codigo }) => codigo))
+
+/**
+ * Presupuestos que puede ver la sesión actual: el administrador ve los de toda la
+ * empresa; el resto del equipo, solo los que emitió con su usuario. La base aplica
+ * la misma regla con RLS; este filtro evita pedir de más.
+ */
+let alcancePresupuestos: { usuario: string; verTodo: boolean } | null = null
+export const definirAlcancePresupuestos = (alcance: { usuario: string; verTodo: boolean } | null) => {
+  alcancePresupuestos = alcance
+}
+/** Aplica el alcance a una consulta de `quotes`. */
+export function filtrarPorAlcance<Q>(consulta: Q): Q {
+  if (!alcancePresupuestos || alcancePresupuestos.verTodo) return consulta
+  return (consulta as unknown as { eq: (columna: string, valor: string) => unknown })
+    .eq('seller_id', alcancePresupuestos.usuario) as Q
+}
 const rolDesdeDb = (r: DbRow): RolEmpresa => ({
   id: String(r.id),
   nombre: String(r.name),
@@ -139,7 +156,15 @@ const rolDesdeDb = (r: DbRow): RolEmpresa => ({
     : [],
 })
 
-export const totalLineas = (lineas: Linea[]) =>
+const claveTerminos = (userId: string) => `presupuestar.terminos.${userId}`
+const terminosAceptadosLocal = (userId: string) => {
+  try { return Boolean(localStorage.getItem(claveTerminos(userId))) } catch { return false }
+}
+const guardarTerminosLocal = (userId: string) => {
+  try { localStorage.setItem(claveTerminos(userId), new Date().toISOString()) } catch { /* sin almacenamiento */ }
+}
+
+export const totalLineas =(lineas: Linea[]) =>
   dinero(lineas.reduce((suma, linea) => suma + linea.cantidad * linea.precioUnitario, 0))
 
 export const repositorio = {
@@ -258,23 +283,23 @@ export const repositorio = {
       const { error } = await supabase.functions.invoke('manage-team', {
         body: { action: 'create', ...datos },
       })
-      if (error) throw error
+      if (error) throw await errorDeFuncion(error)
     },
     async cambiarRol(id: string, role: string) {
       const { error } = await supabase.functions.invoke('manage-team', {
         body: { action: 'set-role', userId: id, role },
       })
-      if (error) throw error
+      if (error) throw await errorDeFuncion(error)
     },
     async eliminar(id: string) {
       const { error } = await supabase.functions.invoke('manage-team', { body: { action: 'delete', userId: id } })
-      if (error) throw error
+      if (error) throw await errorDeFuncion(error)
     },
     async restablecerClave(id: string, password: string) {
       const { error } = await supabase.functions.invoke('manage-team', {
         body: { action: 'reset-password', userId: id, password },
       })
-      if (error) throw error
+      if (error) throw await errorDeFuncion(error)
     },
   },
 
@@ -319,7 +344,7 @@ export const repositorio = {
     /** Copia descargable de la cartera y de los presupuestos de la empresa (Ley 25.326). */
     async exportarPortabilidad() {
       const clientes = errorResult(await supabase.from('clients').select('id,name,email,phone,document,address,created_at,updated_at').is('deleted_at', null).order('name'))
-      const presupuestos = errorResult(await supabase.from('quotes').select('id,number,status,issue_date,valid_until_date,currency,exchange_rate,exchange_rate_date,exchange_rate_source,client_id,client_snapshot,total,created_at').order('number', { ascending: false }))
+      const presupuestos = errorResult(await filtrarPorAlcance(supabase.from('quotes').select('id,number,status,issue_date,valid_until_date,currency,exchange_rate,exchange_rate_date,exchange_rate_source,client_id,client_snapshot,total,created_at')).order('number', { ascending: false }))
       return {
         exportedAt: new Date().toISOString(),
         clients: clientes,
@@ -330,7 +355,7 @@ export const repositorio = {
 
   presupuestos: {
     async listar() {
-      return errorResult(await supabase.from('quotes').select('*').order('number', { ascending: false })).map(presupuestoDesdeDb)
+      return errorResult(await filtrarPorAlcance(supabase.from('quotes').select('*')).order('number', { ascending: false })).map(presupuestoDesdeDb)
     },
     async obtener(id: string) {
       return presupuestoDesdeDb(errorResult(await supabase.from('quotes').select('*').eq('id', id).single()))
@@ -364,11 +389,20 @@ export const repositorio = {
     rol: string
     permisos: PermisoEmpresa[]
     primerAccesoClaveRespondido: boolean
+    terminosAceptados: boolean
   }> {
-    const result = await supabase.from('profiles')
-      .select('company_id,role,name,first_access_password_answered')
+    let result = await supabase.from('profiles')
+      .select('company_id,role,name,first_access_password_answered,terms_accepted_at')
       .eq('user_id', user.id).single()
-    const profile = errorResult(result)
+    // Mientras no esté aplicada la migración de términos, el ingreso no se bloquea.
+    let terminosSinColumna = false
+    if (result.error?.code === '42703') {
+      terminosSinColumna = true
+      result = await supabase.from('profiles')
+        .select('company_id,role,name,first_access_password_answered')
+        .eq('user_id', user.id).single()
+    }
+    const profile = errorResult(result) as DbRow
     const owner = errorResult(await supabase.rpc('is_platform_owner'))
     let permisos: PermisoEmpresa[] = []
     if (!owner) {
@@ -379,9 +413,9 @@ export const repositorio = {
           .eq('company_id', String(profile.company_id ?? '')).eq('id', String(profile.role)).maybeSingle()
         if (role.error) throw role.error
         if (!role.data) throw new Error('El rol de este usuario ya no existe. Pedile al administrador que lo asigne a otro.')
-        permisos = Array.isArray(role.data.permissions)
+        permisos = sinVerTodo(Array.isArray(role.data.permissions)
           ? role.data.permissions.filter((value): value is PermisoEmpresa => PERMISOS_EMPRESA.some((p) => p.codigo === value))
-          : []
+          : [])
         if (permisos.includes('quotes.create') && !permisos.includes('quotes.view_own')) {
           permisos = [...permisos, 'quotes.view_own']
         }
@@ -395,7 +429,20 @@ export const repositorio = {
       rol: owner ? 'propietario' : String(profile.role),
       permisos,
       primerAccesoClaveRespondido: Boolean(profile.first_access_password_answered),
+      terminosAceptados: terminosSinColumna ? terminosAceptadosLocal(user.id) : Boolean(profile.terms_accepted_at),
     }
+  },
+
+  /** Registra que el usuario aceptó los términos y la política de privacidad. */
+  async aceptarTerminos(userId: string) {
+    const { error } = await supabase.from('profiles')
+      .update({ terms_accepted_at: new Date().toISOString() })
+      .eq('user_id', userId)
+    if (error?.code === '42703' || error?.code === 'PGRST204') {
+      guardarTerminosLocal(userId)
+      return
+    }
+    if (error) throw error
   },
 
   /** Ventas por persona del equipo (sin borradores), de mayor a menor monto vendido (aceptado). */

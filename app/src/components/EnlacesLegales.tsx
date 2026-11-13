@@ -38,10 +38,11 @@ export function EnlacesLegales() {
   )
 }
 
-function Terminos() {
+export function Terminos({ nivel = 2 }: { nivel?: 2 | 3 }) {
+  const Titulo = nivel === 2 ? 'h2' : 'h3'
   return (
     <>
-      <h2 id="titulo-legal">Términos y condiciones</h2>
+      <Titulo id={nivel === 2 ? 'titulo-legal' : undefined}>Términos y condiciones</Titulo>
       <div className="texto-legal">
         <p>PresupuestAR se ofrece <strong>tal como está («as is»)</strong> y según disponibilidad. No garantizamos que el servicio sea ininterrumpido, libre de errores ni apto para un resultado comercial determinado. Cada empresa usuaria es responsable de revisar los importes, plazos y condiciones antes de enviar un presupuesto a su cliente.</p>
         <h3>Deslinde fiscal</h3>
@@ -54,10 +55,11 @@ function Terminos() {
   )
 }
 
-function Privacidad() {
+export function Privacidad({ nivel = 2 }: { nivel?: 2 | 3 }) {
+  const Titulo = nivel === 2 ? 'h2' : 'h3'
   return (
     <>
-      <h2 id="titulo-legal">Política de privacidad</h2>
+      <Titulo id={nivel === 2 ? 'titulo-legal' : undefined}>Política de privacidad</Titulo>
       <div className="texto-legal">
         <p>PresupuestAR trata datos personales conforme a la Ley 25.326 de Protección de Datos Personales. La empresa usuaria es responsable del tratamiento de los datos de sus propios clientes (nombre, contacto, documento y domicilio) que carga para cotizar.</p>
         <p>Esos registros se vinculan solo a la empresa que los creó. El propietario de la plataforma no consulta presupuestos, carteras de clientes ni métricas de negocio de los inquilinos.</p>

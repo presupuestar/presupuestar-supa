@@ -4,6 +4,7 @@ import { tienePermiso, useSesion } from '../context/Sesion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { SelloPresupuestar } from './Isotipo'
 import { PrimerAccesoDialog } from './PrimerAccesoDialog'
+import { TerminosDialog } from './TerminosDialog'
 import { EnlacesLegales } from './EnlacesLegales'
 
 const clase = ({ isActive }: { isActive: boolean }) => (isActive ? 'activo' : '')
@@ -26,11 +27,15 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/historial" className={clase}>Historial</NavLink>
           {tienePermiso(usuario, 'clients.manage') && <NavLink to="/clientes" className={clase}>Clientes</NavLink>}
           {usuario?.rol === 'admin' && <NavLink to="/equipo" className={clase}>Equipo</NavLink>}
+          <span className="menu-usuario">
+            <span className="menu-usuario-correo">{usuario?.email}</span>
+            <button type="button" className="btn sec chico" onClick={salir}>Salir</button>
+          </span>
         </nav>
-        <span className="usuario">{usuario?.email} <button className="link" onClick={salir}>Salir</button></span>
+        <span className="usuario"><span className="usuario-correo" title={usuario?.email}>{usuario?.email}</span><button type="button" className="salir" onClick={salir}>Salir</button></span>
       </header>
       {children}
-      <PrimerAccesoDialog />
+      {usuario?.terminosAceptados ? <PrimerAccesoDialog /> : <TerminosDialog />}
       <footer className="pie">
         {empresa?.mostrarSello !== false && <SelloPresupuestar />}
         <EnlacesLegales />

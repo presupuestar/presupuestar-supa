@@ -20,6 +20,10 @@ interface TextoPdf {
   str: string
   x: number
   y: number
+  /** Tamaño aproximado de la letra (alto del glifo en puntos). */
+  alto?: number
+  /** Ancho del texto en puntos. */
+  ancho?: number
 }
 
 function filasDePagina(items: unknown[]): TextoPdf[][] {
@@ -234,9 +238,8 @@ function celdaEnColumna(fila: TextoPdf[], x: number | undefined, columnas: Colum
   return fila.filter((t) => t.x >= anterior && t.x < siguiente).map((t) => t.str.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
 }
 
-function limpiarNombre(texto: string): string {
-  let nombre = texto
-    .replace(/(^|[^\d])\d+(?:\.\d{3})*,\d{1,2}(?=$|[^\d])/g, '$1 ')
+function limpiarNombre(texto: string, quitarImportes = true): string {
+  let nombre = (quitarImportes ? texto.replace(/(^|[^\d])\d+(?:\.\d{3})*,\d{1,2}(?=$|[^\d])/g, '$1 ') : texto)
     .replace(/\s+/g, ' ')
     .trim()
   for (let i = 0; i < 4; i++) {
@@ -289,6 +292,117 @@ function leerMaterial(fila: TextoPdf[], columnas: Columnas | null): MaterialPdf 
   return { nombre, cantidad, precio, moneda: leerMoneda(coincidencia[2]) }
 }
 
+const SOLO_MONEDA = /^(?:U\$S|US\$|U\$D|USD|ARS|AR\$|R\$|EUR|GBP|BRL|\$|€|£)$/i
+const RUIDO_TARJETA = /\b(?:PRECIO(?:S)?(?:\s+DE)?(?:\s+LISTA)?|LISTA|IVA|INCLUIDO|FINAL|CONTADO|OFERTA|PROMO(?:CION)?|STOCK|UNIDAD(?:ES)?|COD(?:IGO)?|SKU|ART(?:ICULO)?\.?|REF(?:ERENCIA)?|CUOTAS?|SIN\s+INTERES)\b/
+
+interface PrecioTarjeta {
+  x: number
+  y: number
+  precio: number
+  moneda: string
+  partes: Set<TextoPdf>
+}
+
+/** Busca importes con moneda (en el mismo texto o en uno vecino de la misma línea). */
+function preciosDeTarjetas(items: TextoPdf[]): PrecioTarjeta[] {
+  const precios: PrecioTarjeta[] = []
+  for (const item of items) {
+    const texto = item.str.trim()
+    if (SOLO_MONEDA.test(texto) || esFechaOEncabezado(texto) || /%/.test(texto)) continue
+    const numero = leerNumero(texto)
+    if (!Number.isFinite(numero) || numero <= 0) continue
+    const vecinos = items
+      // Moneda y precio suelen ir con letras de distinto tamaño: la tolerancia vertical depende del tamaño.
+      .filter((otro) => otro !== item && SOLO_MONEDA.test(otro.str.trim()) &&
+        Math.abs(otro.y - item.y) <= Math.max(2.5, 0.6 * Math.max(otro.alto ?? 0, item.alto ?? 0)))
+      .filter((otro) => {
+        const fin = otro.x + (otro.ancho ?? otro.str.length * (otro.alto ?? 8) * 0.55)
+        const finItem = item.x + (item.ancho ?? texto.length * (item.alto ?? 8) * 0.55)
+        return (otro.x <= item.x && item.x - fin <= 24) || (otro.x >= finItem - 2 && otro.x - finItem <= 24)
+      })
+      .sort((a, b) => Math.abs(a.x - item.x) - Math.abs(b.x - item.x))
+    const marca = /(?:U\$S|US\$|U\$D|USD|ARS|AR\$|R\$|EUR|GBP|\$|€|£)/i.test(texto) ? texto : vecinos[0]?.str ?? ''
+    const formatoPrecio = /^\$?\s*\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$|^\$?\s*\d+,\d{2}$/.test(texto.replace(/^(?:U\$S|US\$|USD|ARS)\s*/i, ''))
+    if (!marca && !formatoPrecio) continue
+    const partes = new Set<TextoPdf>([item])
+    if (vecinos[0] && !/(?:U\$S|US\$|USD|ARS|\$|€|£)/i.test(texto)) partes.add(vecinos[0])
+    const x = Math.min(...[...partes].map((p) => p.x))
+    precios.push({ x, y: item.y, precio: numero, moneda: leerMoneda(marca || texto), partes })
+  }
+  return precios
+}
+
+/**
+ * Catálogos armados como tarjetas o recuadros: cada producto tiene su nombre y, debajo
+ * o al lado, la moneda y el precio. Se toma como nombre el texto más destacado de la
+ * tarjeta (la letra más grande) entre el precio y la tarjeta anterior de la misma columna.
+ */
+function leerMaterialesDeTarjetas(items: TextoPdf[]): MaterialPdf[] {
+  const precios = preciosDeTarjetas(items)
+  if (precios.length === 0) return []
+  const usados = new Set<TextoPdf>(precios.flatMap((p) => [...p.partes]))
+  const materiales: MaterialPdf[] = []
+  const vistos = new Set<string>()
+
+  for (const precio of precios) {
+    const mismaFila = precios.filter((otro) => otro !== precio && Math.abs(otro.y - precio.y) <= 30)
+    const distancia = Math.min(...mismaFila.map((otro) => Math.abs(otro.x - precio.x)).filter((d) => d > 20), Infinity)
+    const anchoTarjeta = Number.isFinite(distancia) ? distancia : 240
+    const izquierda = precio.x - anchoTarjeta * 0.45
+    const derecha = precio.x + anchoTarjeta * 0.8
+    const deColumna = (x: number) => x >= izquierda && x < derecha
+    const techo = precios
+      .filter((otro) => otro !== precio && otro.y > precio.y + 6 && deColumna(otro.x))
+      .reduce((menor, otro) => Math.min(menor, otro.y), precio.y + 180)
+
+    const candidatos = items.filter((item) =>
+      !usados.has(item) &&
+      deColumna(item.x) &&
+      item.y < techo - 2 &&
+      (item.y > precio.y + 2 || (Math.abs(item.y - precio.y) <= 2 && item.x < precio.x)))
+      .filter((item) => {
+        const t = item.str.trim()
+        const n = normalizar(t)
+        return t.length > 1 && !SOLO_MONEDA.test(t) && !/^[\d\s.,:$%-]+$/.test(t) && !esFechaOEncabezado(t) &&
+          !(RUIDO_TARJETA.test(n) && n.split(' ').length <= 3)
+      })
+    if (candidatos.length === 0) continue
+    // Solo el bloque de texto pegado al precio: un salto grande (imagen, borde de la tarjeta,
+    // título de la página) marca el final de la tarjeta.
+    candidatos.sort((a, b) => a.y - b.y)
+    let ultimoY = precio.y
+    const bloque: TextoPdf[] = []
+    for (const c of candidatos) {
+      const salto = Math.max(28, 2.6 * (c.alto ?? 10))
+      if (c.y - ultimoY > salto) break
+      bloque.push(c)
+      ultimoY = Math.max(ultimoY, c.y)
+    }
+    if (bloque.length === 0) continue
+    candidatos.splice(0, candidatos.length, ...bloque)
+
+    const mayor = Math.max(...candidatos.map((c) => c.alto ?? 0))
+    const destacados = mayor > 0 ? candidatos.filter((c) => (c.alto ?? 0) >= mayor - 0.6) : candidatos
+    // Si todo tiene el mismo tamaño, el nombre suele ser lo más cercano al precio.
+    const elegidos = destacados.length === candidatos.length
+      ? candidatos.sort((a, b) => a.y - b.y).slice(0, 3)
+      : destacados
+    // En una tarjeta el precio está aparte: los números con coma del nombre son medidas (2,5 mm).
+    const nombre = limpiarNombre(elegidos
+      .sort((a, b) => b.y - a.y || a.x - b.x)
+      .map((c) => c.str.trim())
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .slice(0, 200), false)
+    if (!nombrePareceMaterial(nombre)) continue
+    const clave = `${normalizar(nombre)}|${precio.precio}|${precio.moneda}`
+    if (vistos.has(clave)) continue
+    vistos.add(clave)
+    materiales.push({ nombre, cantidad: null, precio: precio.precio, moneda: precio.moneda })
+  }
+  return materiales
+}
+
 /** Lee texto seleccionable y detecta filas que terminan en un precio en formato argentino. */
 export async function leerMaterialesPdf(
   archivo: File,
@@ -310,10 +424,13 @@ export async function leerMaterialesPdf(
         const items: TextoPdf[] = []
         for (const item of contenido.items) {
           if (typeof item !== 'object' || item === null || !('str' in item) || !('transform' in item)) continue
-          const texto = item as { str: unknown; transform: unknown }
+          const texto = item as { str: unknown; transform: unknown; width?: unknown; height?: unknown }
           if (typeof texto.str !== 'string' || !Array.isArray(texto.transform)) continue
           const x = texto.transform[4], y = texto.transform[5]
-          if (typeof x === 'number' && typeof y === 'number' && texto.str.trim()) items.push({ str: texto.str, x, y })
+          const escala = Math.hypot(Number(texto.transform[2]) || 0, Number(texto.transform[3]) || 0)
+          const alto = typeof texto.height === 'number' && texto.height > 0 ? texto.height : escala
+          const ancho = typeof texto.width === 'number' ? texto.width : undefined
+          if (typeof x === 'number' && typeof y === 'number' && texto.str.trim()) items.push({ str: texto.str, x, y, alto, ancho })
         }
         return { items, filas: filasDePagina(contenido.items) }
       }))
@@ -326,10 +443,15 @@ export async function leerMaterialesPdf(
         }
         const columnasPagina: Columnas | null = detectarColumnas(filas) ?? columnas
         if (!columnas) columnas = columnasPagina
+        const porFilas: MaterialPdf[] = []
         for (const fila of filas) {
           const material = leerMaterial(fila, columnasPagina)
-          if (material) materiales.push(material)
+          if (material) porFilas.push(material)
         }
+        // Catálogos en tarjetas o recuadros (nombre arriba, moneda y precio abajo):
+        // se usan si encuentran más productos que la lectura por filas.
+        const porTarjetas = leerMaterialesDeTarjetas(items)
+        materiales.push(...(porTarjetas.length > porFilas.length ? porTarjetas : porFilas))
       }
       alProgresar?.({ pagina: fin, paginas: documento.numPages })
     }

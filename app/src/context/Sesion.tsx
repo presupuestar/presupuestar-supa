@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, supabasePropietario } from '../lib/supabase'
-import { repositorio } from '../lib/repositorio'
+import { definirAlcancePresupuestos, repositorio } from '../lib/repositorio'
 import { aplicarTema, restablecerTema } from '../lib/tema'
 import type { Empresa, PermisoEmpresa } from '../lib/tipos'
 
@@ -13,6 +13,7 @@ export interface UsuarioSesion {
   rol: string
   permisos: PermisoEmpresa[]
   primerAccesoClaveRespondido: boolean
+  terminosAceptados: boolean
 }
 
 interface Valor {
@@ -23,6 +24,7 @@ interface Valor {
   errorEmpresa: string
   entrar: (email: string, clave: string) => Promise<void>
   resolverPrimerAcceso: (clave?: string, claveActual?: string) => Promise<void>
+  aceptarTerminos: () => Promise<void>
   salir: () => void
 }
 
@@ -48,10 +50,10 @@ export function SesionProvider({ children }: { children: ReactNode }) {
     let vigente = true
     const cargar = async (user: User | null) => {
       if (!user) {
+        definirAlcancePresupuestos(null)
         if (vigente) {
           setUsuario(null)
           setEmpresa(null)
-          setErrorEmpresa('')
           restablecerTema()
           setCargando(false)
         }
@@ -82,7 +84,11 @@ export function SesionProvider({ children }: { children: ReactNode }) {
           }
           return
         }
-        if (vigente) setUsuario(perfil)
+        if (vigente) {
+          definirAlcancePresupuestos({ usuario: perfil.id, verTodo: perfil.rol === 'admin' })
+          setUsuario(perfil)
+          setErrorEmpresa('')
+        }
       } catch (error) {
         await supabase.auth.signOut({ scope: 'local' })
         if (vigente) setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo cargar el perfil.')
@@ -136,20 +142,35 @@ export function SesionProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     if (!data.user) throw new Error('Supabase no devolvió el usuario autenticado.')
-    setUsuario(await perfilDeUsuario(data.user))
+    try {
+      const perfil = await perfilDeUsuario(data.user)
+      definirAlcancePresupuestos({ usuario: perfil.id, verTodo: perfil.rol === 'admin' })
+      setUsuario(perfil)
+      setErrorEmpresa('')
+    } catch (perfilError) {
+      await supabase.auth.signOut({ scope: 'local' })
+      throw perfilError
+    }
   }
 
   const resolverPrimerAcceso = async (password?: string) => {
     if (!usuario) return
     if (password) {
       const { error } = await supabase.auth.updateUser({ password })
-      if (error) throw error
+      // Repetir la contraseña actual (por ejemplo, la generada) no es un error para el usuario.
+      if (error && error.code !== 'same_password') throw error
     }
     const { error } = await supabase.from('profiles')
       .update({ first_access_password_answered: true })
       .eq('user_id', usuario.id)
     if (error) throw error
     setUsuario({ ...usuario, primerAccesoClaveRespondido: true })
+  }
+
+  const aceptarTerminos = async () => {
+    if (!usuario) return
+    await repositorio.aceptarTerminos(usuario.id)
+    setUsuario({ ...usuario, terminosAceptados: true })
   }
 
   const salir = () => { void supabase.auth.signOut({ scope: 'local' }) }
@@ -163,6 +184,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
       errorEmpresa,
       entrar,
       resolverPrimerAcceso,
+      aceptarTerminos,
       salir,
     }}>
       {children}

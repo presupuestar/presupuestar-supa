@@ -1,5 +1,5 @@
 /* Tokens: los colores y fuentes de la empresa los inyecta lib/tema.ts */
-:root{--primario:#0B2545;--acento:#5BB5F0;--tinta:#101828;--muted:#5B6678;--linea:#E2E8F0;--niebla:#F7F9FC;--ok:#12643F;--no:#B42318;--pe:#7A5300;
+:root{--primario:#0B2545;--acento:#5BB5F0;--tinta:#101828;--muted:#5B6678;--linea:#D4DCE7;--niebla:#EDF1F6;--ok:#12643F;--no:#B42318;--pe:#7A5300;
   --grafico-aceptado:#198754;--grafico-pendiente:#E6A700;--grafico-rechazado:#D64545;
   --grafico-vendedor-1:#168AAD;--grafico-vendedor-2:#3772CB;--grafico-vendedor-3:#75808A;--grafico-vendedor-4:#7C4DFF;
   --grafico-vendedor-5:#E85D75;--grafico-vendedor-6:#00897B;--grafico-vendedor-7:#F07818;--grafico-vendedor-8:#729C27;
@@ -598,4 +598,248 @@ a.link{color:var(--primario)}
   .grafico-barras{padding:14px}
   .grafico-barras-fila{grid-template-columns:minmax(70px,100px) minmax(35px,1fr) max-content;gap:6px;padding:5px 2px;font-size:11px}
   .grafico-barras-valor{font-size:11px}
+}
+
+/* Contraste de contenedores con el fondo */
+:root{--sombra-caja:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.05)}
+.panel,.tabla-caja,.listo,.tarjetas article,.resumen dl div,.barra-seleccion-catalogo,.seccion-proveedor>.catalogo-desplegable-resumen,.grafico-circular,.grafico-barras{box-shadow:var(--sombra-caja)}
+.barra{box-shadow:0 1px 0 var(--linea),0 2px 10px rgba(16,24,40,.04)}
+
+/* Inicio: menos aire entre el saludo y lo que sigue */
+.contenido.inicio>.encabezado{margin-bottom:18px}
+.contenido.inicio>.encabezado .sub{margin:4px 0 0}
+.contenido.inicio .resumen{margin-top:20px}
+
+/* Roles personalizados: permisos como etiquetas que se acomodan */
+.lista-roles{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.lista-roles>li{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:14px 16px;border:1px solid var(--linea);border-radius:12px;background:#fff}
+.rol-detalle{display:grid;gap:8px;min-width:0;flex:1}
+.rol-detalle small{color:var(--muted);font-size:13px}
+.chips-permisos{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.chips-permisos li{padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--acento) 16%,#fff);color:var(--primario);font-size:12.5px;font-weight:500;line-height:1.5}
+.lista-roles .acciones{display:flex;gap:14px;flex:none;padding-top:2px}
+@media (max-width:620px){.lista-roles>li{flex-direction:column}.lista-roles .acciones{padding-top:0}}
+
+/* Seña en la barra del total */
+.sena-resumen{color:var(--muted);font-size:13px}
+.sena-resumen b{color:var(--primario);font-weight:600}
+
+/* Aceptación de términos en el primer ingreso */
+.terminos-dialog{max-width:680px}
+.terminos-dialog .sub{margin:4px 0 0}
+.terminos-scroll{max-height:min(46vh,420px);overflow:auto;padding:14px 16px;border:1px solid var(--linea);border-radius:12px;background:var(--niebla)}
+.terminos-dialog .check{align-items:flex-start;color:var(--tinta)}
+.terminos-dialog .check input{margin-top:5px}
+.permiso-implicito{color:var(--muted);font-size:12.5px}
+.permisos-rol input:disabled{cursor:not-allowed;opacity:.7}
+
+/* ───────── Ajustes de diseño (misma línea visual: Poppins, primario de la marca, bordes suaves) ───────── */
+
+/* Ancho y ritmo de página iguales en todas las secciones */
+.contenido,.contenido.ancho{max-width:1080px;padding-top:36px}
+h1{font-size:clamp(26px,3vw,32px)}
+.encabezado{margin-bottom:22px}
+.encabezado h1+.sub,.encabezado .sub{margin:6px 0 0}
+.filtros{margin:0 0 16px}
+.contenido>.sub{margin:6px 0 22px}
+.panel h2{font-size:17px}
+
+/* Barra superior */
+.barra{position:sticky;top:0;z-index:20;gap:28px;padding:12px 28px;min-height:62px}
+.barra nav{gap:4px}
+.barra nav a{padding:7px 12px;border-radius:9px;transition:background-color 150ms ease,color 150ms ease}
+.barra nav a:hover{background:var(--niebla);color:var(--primario)}
+.barra nav a.activo,.barra .activo{border-bottom:0;padding-bottom:7px;background:color-mix(in srgb,var(--acento) 16%,#fff);color:var(--primario);font-weight:600}
+.usuario{display:flex;align-items:center;gap:12px;min-width:0}
+.usuario-correo{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.salir{padding:6px 12px;border:1px solid var(--linea);border-radius:9px;background:#fff;color:var(--primario);font:500 13px var(--fuente-texto);cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease}
+.salir:hover{border-color:var(--primario);background:var(--niebla)}
+.menu-usuario{display:none}
+.marca img{max-width:160px;object-fit:contain}
+
+/* Botones y campos: respuesta al pasar el mouse */
+.btn{transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,box-shadow 150ms ease}
+.btn:not(.sec):not(:disabled):hover{background:color-mix(in srgb,var(--primario) 86%,#000)}
+.btn.sec:not(:disabled):hover{background:color-mix(in srgb,var(--acento) 10%,#fff)}
+.btn.chico{border-radius:10px}
+.campo input:hover:not(:focus):not(:disabled),.campo select:hover:not(:focus),.campo textarea:hover:not(:focus),.filtros input:hover:not(:focus),.filtro-estado:hover{border-color:color-mix(in srgb,var(--primario) 30%,var(--linea))}
+.campo input,.campo select,.campo textarea,.filtros input[type=search],.filtro-estado{transition:border-color 150ms ease,box-shadow 150ms ease}
+.campo input:disabled{background:var(--niebla);color:var(--muted)}
+.link{text-underline-offset:3px}
+.link:hover{color:color-mix(in srgb,var(--primario) 75%,var(--acento))}
+
+/* Tablas */
+.tabla{font-size:14.5px}
+.tabla thead th{padding-top:12px;padding-bottom:12px;background:color-mix(in srgb,var(--niebla) 70%,#fff);font-size:12.5px}
+.tabla thead th:first-child{border-top-left-radius:15px}
+.tabla thead th:last-child{border-top-right-radius:15px}
+.tabla tbody tr{transition:background-color 120ms ease}
+.tabla tbody tr:not(.fila-vacia):hover td{background:color-mix(in srgb,var(--niebla) 55%,#fff)}
+.cliente-nombre{font-weight:600;text-decoration:none;text-align:left}
+.cliente-nombre:hover{text-decoration:underline}
+
+/* Avisos */
+.aviso-vigencia{border:1px solid #F7CFCB}
+.aviso-cotizacion{border:1px solid #BFE6D2}
+
+/* Ventanas */
+dialog{border-radius:18px}
+.ventana .form h2,dialog .form>h2{font-size:21px}
+
+/* Pie */
+.pie{padding:28px 16px 22px}
+
+/* Inicio: "Ver historial" queda a la derecha del título también en el celular */
+.resumen>.encabezado{flex-wrap:nowrap;align-items:baseline;margin-bottom:0}
+.resumen>.encabezado>h2{flex:1 1 auto;min-width:0}
+.resumen>.encabezado>.link{flex:none;white-space:nowrap;font-size:14px}
+
+@media (max-width:820px){
+  .contenido,.contenido.ancho{padding:22px 16px}
+  .contenido.ancho.presupuesto-edicion{padding-bottom:200px}
+  .panel{padding:18px 16px}
+  .barra{padding:10px 16px;min-height:58px;flex-wrap:wrap}
+  .barra .usuario{display:none}
+  .barra nav a{padding:12px 6px;border-radius:0}
+  .barra nav a.activo{background:none;border-bottom:1px solid var(--linea);color:var(--primario);box-shadow:inset 3px 0 0 var(--acento);padding-left:12px}
+  .barra nav a:hover{background:none}
+  .menu-usuario{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 6px 6px;min-width:0}
+  .menu-usuario-correo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:13px}
+  .menu-usuario .btn{flex:none}
+  .encabezado{margin-bottom:18px}
+  .encabezado-acciones{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .tabla thead th:first-child,.tabla thead th:last-child{border-radius:0}
+
+  /* Clientes como tarjetas */
+  .tabla-clientes-caja{overflow:visible;border:0;background:transparent;box-shadow:none}
+  .tabla-clientes{display:block;min-width:0}
+  .tabla-clientes thead{display:none}
+  .tabla-clientes tbody{display:grid;gap:10px}
+  .tabla-clientes tbody tr:not(.fila-vacia){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;padding:10px 14px;background:#fff;border:1px solid var(--linea);border-radius:12px;box-shadow:var(--sombra-caja)}
+  .tabla-clientes tbody tr+tr td{border-top:0}
+  .tabla-clientes tbody td{min-width:0;padding:6px 0;font-size:13.5px;overflow-wrap:anywhere}
+  .tabla-clientes tbody tr:hover td{background:none}
+  .tabla-clientes td[data-label]::before{content:attr(data-label);display:block;margin-bottom:2px;color:var(--muted);font-size:11px;font-weight:500}
+  .tabla-clientes .cliente-celda-nombre{grid-column:1/-1;padding:4px 0 9px;border-bottom:1px solid color-mix(in srgb,var(--linea) 65%,#fff);font-size:15px}
+  .tabla-clientes td[data-label="Correo"]{grid-column:1/-1}
+  .tabla-clientes .acciones{grid-column:1/-1;justify-content:flex-start;gap:18px;padding:9px 0 3px;border-top:1px solid color-mix(in srgb,var(--linea) 65%,#fff)}
+  .tabla-clientes .fila-vacia{display:block;background:#fff;border:1px solid var(--linea);border-radius:12px}
+  .tabla-clientes .fila-vacia td{display:block}
+}
+
+@media (max-width:480px){
+  .contenido,.contenido.ancho{padding-right:16px;padding-left:16px}
+  .panel{padding:16px 14px}
+  .barra-total{padding-right:16px;padding-left:16px}
+  .encabezado-acciones{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:820px){
+  .barra{row-gap:0}
+  .barra nav.menu-abierto{margin-top:10px}
+  .encabezado>.btn{width:auto}
+}
+@media (max-width:600px){
+  .grafico-circular-encabezado{flex-direction:column;gap:6px}
+  .grafico-circular-encabezado p{display:flex;align-items:baseline;justify-content:space-between;gap:8px;width:100%;text-align:left}
+}
+@media (max-width:820px){
+  .barra nav.menu-abierto{max-height:calc(100dvh - 80px);overflow-y:auto}
+}
+@media (min-width:481px) and (max-width:820px){
+  .filtros{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .filtros input[type=search],.filtros>:only-child{grid-column:1/-1}
+}
+@media (max-width:480px){
+  .encabezado>.btn{width:100%}
+}
+
+/* ───────── Animaciones: cortas y suaves; se apagan con "reducir movimiento" ───────── */
+:root{--curva-salida:cubic-bezier(.2,.8,.2,1);--curva-suave:cubic-bezier(.4,0,.2,1)}
+@keyframes aparecer{from{opacity:0}to{opacity:1}}
+@keyframes subir{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes bajar{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes ventana-entra{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes barra-crece{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes porcion-entra{from{opacity:0;transform:scale(.82) rotate(-12deg)}to{opacity:1;transform:none}}
+@keyframes barra-total-entra{from{transform:translateY(100%)}to{transform:none}}
+@keyframes aviso-entra{0%{opacity:0;transform:translateY(-4px)}60%{opacity:1}100%{opacity:1;transform:none}}
+
+/* Bloques de cada pantalla: entran uno detrás de otro */
+.contenido>.panel,.contenido>section,.contenido>.tabla-caja,.contenido>.filtros,.contenido>.barra-seleccion-catalogo,
+.contenido>details,.resumen-mes>*,.graficos-barras>*,.graficos-circulares>*,.lista-roles>li{animation:subir 360ms var(--curva-salida) both}
+.contenido>:nth-child(2){animation-delay:40ms}
+.contenido>:nth-child(3){animation-delay:80ms}
+.contenido>:nth-child(4){animation-delay:120ms}
+.contenido>:nth-child(5){animation-delay:160ms}
+.contenido>:nth-child(6){animation-delay:200ms}
+.contenido>:nth-child(n+7){animation-delay:230ms}
+.resumen-mes>:nth-child(2),.graficos-barras>:nth-child(2),.graficos-circulares>:nth-child(2){animation-delay:90ms}
+.lista-roles>li:nth-child(2){animation-delay:50ms}.lista-roles>li:nth-child(3){animation-delay:100ms}.lista-roles>li:nth-child(n+4){animation-delay:140ms}
+
+/* Filas y tarjetas de las tablas */
+.tabla tbody tr:not(.fila-vacia){animation:subir 300ms var(--curva-salida) both}
+.tabla tbody tr:nth-child(2){animation-delay:25ms}.tabla tbody tr:nth-child(3){animation-delay:50ms}
+.tabla tbody tr:nth-child(4){animation-delay:75ms}.tabla tbody tr:nth-child(5){animation-delay:100ms}
+.tabla tbody tr:nth-child(6){animation-delay:125ms}.tabla tbody tr:nth-child(7){animation-delay:150ms}
+.tabla tbody tr:nth-child(n+8){animation-delay:170ms}
+.chips-permisos li{animation:aparecer 260ms ease both}
+
+/* Gráficos */
+.grafico-barras-relleno{transform-origin:left center;animation:barra-crece 700ms var(--curva-salida) 150ms both}
+.grafico-circular-pie>g{transform-box:view-box;transform-origin:100px 100px;animation:porcion-entra 600ms var(--curva-salida) both}
+.grafico-circular-pie>g:nth-of-type(2){animation-delay:90ms}
+.grafico-circular-pie>g:nth-of-type(3){animation-delay:180ms}
+.grafico-circular-pie>g:nth-of-type(n+4){animation-delay:240ms}
+.grafico-circular-leyenda li{animation:aparecer 300ms ease both}
+.grafico-circular-leyenda li:nth-child(1){animation-delay:200ms}
+.grafico-circular-leyenda li:nth-child(2){animation-delay:260ms}
+.grafico-circular-leyenda li:nth-child(n+3){animation-delay:320ms}
+
+/* Ventanas y su fondo */
+dialog:not(.confirmacion-eliminacion)[open]{animation:ventana-entra 260ms var(--curva-salida) both}
+dialog:not(.confirmacion-eliminacion)[open]::backdrop{animation:aparecer 200ms ease both}
+
+/* Elementos que aparecen al interactuar */
+.error,.aviso,.aviso-vigencia,.aviso-cotizacion,.ok-msg,.linea .desc small.ok{animation:aviso-entra 260ms var(--curva-salida) both}
+.resultados-agregar-item,.catalogo-menu-fila>div{animation:bajar 180ms var(--curva-salida) both}
+.eleccion-moneda-item,.formulario-rol,.revision-importacion{animation:subir 260ms var(--curva-salida) both}
+.lineas>.linea:not(.cab){animation:subir 260ms var(--curva-salida) both}
+.barra-total{animation:barra-total-entra 380ms var(--curva-salida) 120ms both}
+.listo{animation:subir 360ms var(--curva-salida) both}
+.vista-pdf{animation:aparecer 400ms ease 150ms both}
+.login-form form{animation:subir 420ms var(--curva-salida) 80ms both}
+.login-lado>*{animation:subir 480ms var(--curva-salida) both}
+.login-lado>:nth-child(2){animation-delay:80ms}.login-lado>:nth-child(3){animation-delay:160ms}
+
+/* Respuesta al tocar */
+.btn,.salir,.accion-historial,.quitar,.seccion-icono,.catalogo-desplegable-icono,.menu-toggle{transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,box-shadow 150ms ease,transform 120ms ease}
+.btn:not(:disabled):active,.salir:active,.accion-historial:not(:disabled):active,.menu-toggle:active{transform:scale(.97)}
+.quitar:active{transform:scale(.9)}
+.link{transition:color 150ms ease}
+.check input,.permisos-rol input,.seleccionar-item input{transition:transform 120ms ease}
+.check input:active,.permisos-rol input:active,.seleccionar-item input:active{transform:scale(.9)}
+.permisos-rol label{transition:background-color 150ms ease}
+.estado-sel{transition:background-color 200ms ease,color 200ms ease}
+.resultados-agregar-item button,.grafico-barras-fila{transition:background-color 120ms ease}
+.chips-permisos li,.pill{transition:background-color 150ms ease}
+
+/* Tarjetas del celular: leve elevación al tocar */
+@media (max-width:820px){
+  .tabla-historial tbody tr,.tabla-clientes tbody tr:not(.fila-vacia),.tabla-catalogo tbody tr:not(.fila-vacia),.tabla-equipo tbody tr:not(.fila-vacia){transition:box-shadow 180ms ease,transform 180ms ease}
+  .tabla-historial tbody tr:active,.tabla-clientes tbody tr:not(.fila-vacia):active{transform:scale(.995)}
+}
+@media (hover:hover){
+  .grafico-circular,.grafico-barras{transition:box-shadow 200ms ease}
+  .grafico-circular:hover,.grafico-barras:hover{box-shadow:0 2px 4px rgba(16,24,40,.06),0 10px 24px rgba(16,24,40,.08)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after,dialog::backdrop{animation-duration:1ms!important;animation-delay:0ms!important;transition-duration:1ms!important}
+}
+
+/* Separaciones mínimas entre controles */
+.asignar-proveedor{display:inline-flex;align-items:center;gap:8px}
+@media (max-width:820px){
+  .barra-seleccion-catalogo{gap:8px}
+  .barra-seleccion-catalogo .asignar-proveedor{display:grid;gap:8px}
 }

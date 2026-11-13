@@ -4,7 +4,7 @@ import { Layout } from '../components/Layout'
 import { tienePermiso, useSesion } from '../context/Sesion'
 import { mensajeError } from '../lib/errores'
 import { fechaCorta, importeEnMoneda } from '../lib/formato'
-import { repositorio } from '../lib/repositorio'
+import { filtrarPorAlcance, repositorio } from '../lib/repositorio'
 import { supabase } from '../lib/supabase'
 import type { Cliente, Estado, Presupuesto } from '../lib/tipos'
 import { ETIQUETA, fechaVigencia, presupuestoCaducado } from '../lib/estados'
@@ -47,7 +47,7 @@ export function Clientes() {
     }
     let active = true
     setQuotes(null)
-    const consulta = supabase.from('quotes').select('*', { count: 'exact' }).eq('client_id', selected.id)
+    const consulta = filtrarPorAlcance(supabase.from('quotes').select('*', { count: 'exact' }).eq('client_id', selected.id))
       .order('number', { ascending: false }).range(quotePage * pageSize, (quotePage + 1) * pageSize - 1)
     void Promise.resolve(consulta)
       .then(({ data, count, error: resultError }) => {
@@ -178,14 +178,16 @@ export function Clientes() {
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     <div className="filtros"><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, correo o teléfono…" aria-label="Buscar clientes" /></div>
-    <div className="tabla-caja"><table className="tabla">
-      <thead><tr><th>Cliente</th><th>Correo</th><th>Teléfono</th><th>Documento</th><th /></tr></thead>
+    <div className="tabla-caja tabla-clientes-caja"><table className="tabla tabla-clientes">
+      <thead><tr><th>Cliente</th><th>Correo</th><th>Teléfono</th><th>Documento</th><th><span className="sr">Acciones</span></th></tr></thead>
       <tbody>
-        {clients === null && <tr><td className="vacio" colSpan={5}>Cargando…</td></tr>}
-        {clients !== null && visibleClients.length === 0 && <tr><td className="vacio" colSpan={5}>{clients.length ? 'No hay coincidencias.' : 'Todavía no hay clientes guardados.'}</td></tr>}
+        {clients === null && <tr className="fila-vacia"><td className="vacio" colSpan={5}>Cargando…</td></tr>}
+        {clients !== null && visibleClients.length === 0 && <tr className="fila-vacia"><td className="vacio" colSpan={5}>{clients.length ? 'No hay coincidencias.' : 'Todavía no hay clientes guardados.'}</td></tr>}
         {visibleClients.map((client) => <tr key={client.id}>
-          <td><button className="link cliente-nombre" onClick={() => { setSelected(client); setQuotePage(0) }}>{client.nombre}</button></td>
-          <td>{client.email}</td><td>{client.telefono}</td><td>{client.documento || '—'}</td>
+          <td className="cliente-celda-nombre"><button className="link cliente-nombre" onClick={() => { setSelected(client); setQuotePage(0) }}>{client.nombre}</button></td>
+          <td data-label="Correo">{client.email || <span className="sin-dato">—</span>}</td>
+          <td data-label="Teléfono">{client.telefono || <span className="sin-dato">—</span>}</td>
+          <td data-label="Documento">{client.documento || <span className="sin-dato">—</span>}</td>
           <td className="acciones"><button className="link" onClick={() => setEditing(client)}>Editar</button><button className="link peligro" onClick={() => void remove(client)}>Eliminar</button></td>
         </tr>)}
       </tbody>

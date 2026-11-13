@@ -26,6 +26,10 @@ alter table public.quotes
   add column if not exists valid_until_date date,
   add column if not exists exchange_rate_source text not null default '';
 
+-- Completar datos de presupuestos existentes sin pasar por prepare_quote: el trigger
+-- exige una sesión de usuario o service_role, y el SQL Editor / db push no tienen ninguna.
+alter table public.quotes disable trigger quotes_prepare_before_write;
+
 update public.quotes
 set exchange_rate_source = 'dolarapi.com · dólar blue venta'
 where exchange_rate > 0 and btrim(exchange_rate_source) = '';
@@ -37,6 +41,8 @@ where valid_until_date is null and issue_date is not null;
 update public.quotes
 set valid_until_date = (created_at at time zone 'America/Argentina/Buenos_Aires')::date + 14
 where valid_until_date is null;
+
+alter table public.quotes enable trigger quotes_prepare_before_write;
 
 alter table public.quotes
   alter column valid_until_date set not null;

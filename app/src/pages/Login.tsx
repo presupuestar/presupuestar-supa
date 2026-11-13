@@ -4,9 +4,10 @@ import { Link } from 'react-router-dom'
 import { useSesion } from '../context/Sesion'
 import { Isotipo } from '../components/Isotipo'
 import { EnlacesLegales } from '../components/EnlacesLegales'
+import { mensajeError } from '../lib/errores'
 
 export function Login() {
-  const { usuario, entrar } = useSesion()
+  const { usuario, entrar, errorEmpresa } = useSesion()
   const [email, setEmail] = useState('')
   const [clave, setClave] = useState('')
   const [error, setError] = useState('')
@@ -17,8 +18,8 @@ export function Login() {
   const enviar = async (ev: FormEvent) => {
     ev.preventDefault()
     setError(''); setEnviando(true)
-    try { await entrar(email, clave) }
-    catch { setError('Correo o contraseña incorrectos.') }
+    try { await entrar(email.trim(), clave) }
+    catch (e) { setError(mensajeError(e, 'No se pudo iniciar sesión.')) }
     finally { setEnviando(false) }
   }
 
@@ -39,7 +40,7 @@ export function Login() {
             <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="current-password" required />
           </label>
           <Link className="link" to="/recuperar">¿Olvidaste tu contraseña?</Link>
-          {error && <p className="error" role="alert">{error}</p>}
+          {(error || errorEmpresa) && <p className="error" role="alert">{error || errorEmpresa}</p>}
           <button className="btn" disabled={enviando}>{enviando ? 'Ingresando…' : 'Ingresar'}</button>
           <EnlacesLegales />
         </form>

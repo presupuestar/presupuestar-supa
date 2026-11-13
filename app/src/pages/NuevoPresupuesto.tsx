@@ -257,8 +257,8 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
       const fechaEmision = inicial?.fechaEmision || hoy()
       const datos = { nombre: nombre.trim(), email: email.trim(), telefono: telefono.trim(), documento: documento.trim(), direccion: direccion.trim() }
       let clienteId = clienteSel
-      // Los clientes guardados exigen los tres datos: solo se actualizan o crean si están completos.
-      if (datos.nombre && EMAIL.test(datos.email) && datos.telefono) {
+      // Alcanza con el nombre para guardar al cliente; el resto de los datos es opcional.
+      if (datos.nombre) {
         if (clienteSel) await repositorio.clientes.actualizar(clienteSel, datos)
         else if (guardarCliente) clienteId = (await repositorio.clientes.crear(datos)).id
       }
@@ -347,11 +347,11 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
                       autoFocus={foco === l.key} onChange={(e) => cambiarLinea(l.key, { descripcion: e.target.value })} />
                     <textarea aria-label="Detalle opcional" placeholder="Detalle adicional (opcional)" rows={2} maxLength={500} value={l.detalle}
                       onChange={(e) => cambiarLinea(l.key, { detalle: e.target.value })} />
-                    {l.proveedor && l.itemId !== null && <small className="proveedor-interno">Proveedor (uso interno): {l.proveedor}</small>}
+                    {l.proveedor && l.itemId !== null && <small className="proveedor-interno">Origen (uso interno): {l.proveedor}</small>}
                     {l.itemId === null && (
                       <>
-                        <label className="campo proveedor-personalizado">Mayorista <small>(opcional · uso interno)</small>
-                          <input list="mayoristas-catalogo" maxLength={160} value={l.proveedor ?? ''} onChange={(e) => cambiarLinea(l.key, { proveedor: e.target.value })} placeholder="Asignar proveedor" />
+                        <label className="campo proveedor-personalizado">Origen <small>(marca o proveedor · opcional · uso interno)</small>
+                          <input list="mayoristas-catalogo" maxLength={160} value={l.proveedor ?? ''} onChange={(e) => cambiarLinea(l.key, { proveedor: e.target.value })} placeholder="Marca, mayorista o proveedor" />
                         </label>
                         <small>
                           <span className="pill pers">Personalizado</span>
@@ -399,7 +399,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
                   else void agregarDelCatalogo(item.id)
                 }}>
                   <span>{item.nombre}</span>
-                  <small>{item.proveedor?.trim() || 'Sin mayorista'} · {importeEnMoneda(item.precio, item.moneda)}</small>
+                  <small>{item.proveedor?.trim() || 'Sin origen'} · {importeEnMoneda(item.precio, item.moneda)}</small>
                 </button>
               ))}
               {itemsCatalogoFiltrados.length === 0 && <p>No se encontraron ítems con ese nombre.</p>}
@@ -470,7 +470,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
         <div className="total-num">
           <span>Total ({monedaPresupuesto})</span>
           <strong>{importeEnMoneda(total, monedaPresupuesto)}</strong>
-          {requiereSena(pagoOpcion === OTRA_FORMA ? pagoOtra : pagoOpcion) && <small>Seña del 50%: {importeEnMoneda(Math.round(total * 50) / 100, monedaPresupuesto)}</small>}
+          {requiereSena(pagoOpcion === OTRA_FORMA ? pagoOtra : pagoOpcion) && <small className="sena-resumen">Seña al aceptar (50%): <b>{importeEnMoneda(Math.round(total * 50) / 100, monedaPresupuesto)}</b> · Saldo a la entrega: <b>{importeEnMoneda(Math.round((total - Math.round(total * 50) / 100) * 100) / 100, monedaPresupuesto)}</b></small>}
         </div>
         <div className={`botones${inicial?.estado === 'pendiente' ? ' una-accion' : ''}`}>
           {error && <p className="error" role="alert">{error}</p>}

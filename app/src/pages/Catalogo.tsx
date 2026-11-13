@@ -90,7 +90,7 @@ export function Catalogo() {
     const grupos = new Map<string, Item[]>()
     const inicio = paginaItems * ITEMS_POR_PAGINA
     for (const item of visibles.slice(inicio, inicio + ITEMS_POR_PAGINA)) {
-      const clave = item.proveedor?.trim() || 'Sin proveedor'
+      const clave = item.proveedor?.trim() || 'Sin origen'
       const grupo = grupos.get(clave)
       if (grupo) grupo.push(item)
       else grupos.set(clave, [item])
@@ -139,7 +139,7 @@ export function Catalogo() {
   const ejecutarSeleccion = async (accion: 'activar' | 'desactivar' | 'eliminar' | 'proveedor') => {
     const objetivos = (items ?? []).filter((item) => seleccionados.has(item.id))
     if (objetivos.length === 0 || procesandoLote) return
-    if (accion === 'proveedor' && !proveedorSeleccion.trim()) return setError('Escribí el nombre del proveedor para asignarlo a los ítems seleccionados.')
+    if (accion === 'proveedor' && !proveedorSeleccion.trim()) return setError('Escribí la marca o el proveedor para asignarlo a los ítems seleccionados.')
     if (accion === 'eliminar' && !confirmarEliminacion) {
       setConfirmarEliminacion(true)
       return
@@ -185,7 +185,7 @@ export function Catalogo() {
 
   const procesarPdf = async () => {
     if (!archivoPdf) return setError('Elegí un archivo PDF para importar.')
-    if (!mayoristaImportacion) return setError('Seleccioná un mayorista existente o escribí el nombre de uno nuevo antes de leer el PDF.')
+    if (!mayoristaImportacion) return setError('Elegí el origen del catálogo (marca, mayorista o proveedor) o escribí uno nuevo antes de leer el PDF.')
     if (archivoPdf.type !== 'application/pdf' && !archivoPdf.name.toLowerCase().endsWith('.pdf')) return setError('El archivo seleccionado no es un PDF.')
     if (archivoPdf.size > 20 * 1024 * 1024) return setError('El PDF supera el máximo permitido de 20 MB.')
     setError('')
@@ -230,7 +230,7 @@ export function Catalogo() {
   }
 
   const guardarImportacion = async () => {
-    if (!mayoristaImportacion) return setError('Seleccioná un mayorista existente o escribí el nombre de uno nuevo antes de cargar los materiales.')
+    if (!mayoristaImportacion) return setError('Elegí el origen del catálogo (marca, mayorista o proveedor) o escribí uno nuevo antes de cargar los materiales.')
     const seleccionados = candidatos.filter((c) => c.seleccionado)
     if (seleccionados.length === 0) return setError('Seleccioná al menos un material para cargar.')
     const invalidos = seleccionados.find((c) => !c.nombre.trim() || !Number.isFinite(parseImporte(c.precio)) || parseImporte(c.precio) < 0)
@@ -373,9 +373,9 @@ export function Catalogo() {
 
         <div className="filtros">
           <input type="search" placeholder="Buscar ítem…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar ítem" />
-          <select value={proveedor} onChange={(e) => setProveedor(e.target.value)} aria-label="Filtrar por proveedor" className="filtro-estado">
-            <option value="todos">Todos los proveedores</option>
-            <option value="sin-proveedor">Sin proveedor</option>
+          <select value={proveedor} onChange={(e) => setProveedor(e.target.value)} aria-label="Filtrar por origen" className="filtro-estado">
+            <option value="todos">Todos los orígenes</option>
+            <option value="sin-proveedor">Sin origen</option>
             {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
           <label className="check"><input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} /> Mostrar desactivados</label>
@@ -395,8 +395,8 @@ export function Catalogo() {
           <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('activar')}>Activar</button>
           <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('desactivar')}>Desactivar</button>
           <div className="asignar-proveedor">
-            <label className="sr" htmlFor="proveedor-seleccionados">Mayorista para los seleccionados</label>
-            <input id="proveedor-seleccionados" value={proveedorSeleccion} onChange={(e) => setProveedorSeleccion(e.target.value)} maxLength={160} placeholder="Mayorista" disabled={cantidadSeleccionada === 0 || confirmarEliminacion || procesandoLote} />
+            <label className="sr" htmlFor="proveedor-seleccionados">Origen para los seleccionados</label>
+            <input id="proveedor-seleccionados" value={proveedorSeleccion} onChange={(e) => setProveedorSeleccion(e.target.value)} maxLength={160} placeholder="Marca, mayorista o proveedor" disabled={cantidadSeleccionada === 0 || confirmarEliminacion || procesandoLote} />
             <button type="button" className="btn sec chico" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('proveedor')}>Asignar</button>
           </div>
           <button type="button" className="btn sec chico peligro-catalogo" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('eliminar')}>
@@ -431,13 +431,13 @@ export function Catalogo() {
         ) : secciones.map(([nombreProveedor, productos]) => (
         <details className="seccion-proveedor catalogo-desplegable" key={nombreProveedor}>
           <summary className="catalogo-desplegable-resumen">
-            <span className="seccion-proveedor-titulo"><span className="etiqueta-mayorista">Mayorista</span><strong>{nombreProveedor}</strong></span>
+            <span className="seccion-proveedor-titulo"><span className="etiqueta-mayorista">Origen</span><strong>{nombreProveedor}</strong></span>
             <small>{productos.length} ítem{productos.length === 1 ? '' : 's'} en esta página</small>
             <span className="catalogo-desplegable-icono" aria-hidden="true" />
           </summary>
           <div className="tabla-caja">
           <table className="tabla tabla-catalogo">
-            <thead><tr><th>Ítem</th><th>Proveedor / mayorista</th><th>Unidad</th><th className="num">Precio</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
+            <thead><tr><th>Ítem</th><th>Origen (marca / proveedor)</th><th>Unidad</th><th className="num">Precio</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
             <tbody key={paginaItems}>
               {productos.map((i) => (
                 <tr key={i.id} className={`${i.activo ? '' : 'apagado'}${seleccionados.has(i.id) ? ' seleccionado' : ''}`}>
@@ -445,7 +445,7 @@ export function Catalogo() {
                     <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i.id, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>
                     <span className="catalogo-identidad"><strong>{i.nombre}</strong>{i.descripcion && <small>{i.descripcion}</small>}</span>
                   </td>
-                  <td className="catalogo-proveedor" data-label="Proveedor / mayorista">{i.proveedor?.trim() || <span className="sin-dato">Sin asignar</span>}</td>
+                  <td className="catalogo-proveedor" data-label="Origen (marca / proveedor)">{i.proveedor?.trim() || <span className="sin-dato">Sin asignar</span>}</td>
                   <td className="catalogo-unidad" data-label="Unidad">{i.unidad || '—'}</td>
                   <td className="catalogo-precio num" data-label="Precio">{importeEnMoneda(i.precio, i.moneda)}</td>
                   <td className="catalogo-estado" data-label="Estado"><span className={`pill ${i.activo ? 'on' : 'off'}`}>{i.activo ? 'Activo' : 'Desactivado'}</span></td>
@@ -487,21 +487,21 @@ export function Catalogo() {
             <div className="botones importador-acciones">
               <button type="button" className="btn sec chico" onClick={() => pdfInput.current?.click()}>Importar PDF</button>
             </div>
-            <p className="ayuda">Leemos catálogos con texto seleccionable y detectamos filas que terminan en un precio. La moneda explícita del PDF (incluida la que aparece junto al precio) prevalece; al reimportar, también corregimos la moneda de registros existentes con el mismo nombre, mayorista e importe.</p>
+            <p className="ayuda">Leemos catálogos con texto seleccionable y detectamos filas que terminan en un precio. La moneda explícita del PDF (incluida la que aparece junto al precio) prevalece; al reimportar, también corregimos la moneda de registros existentes con el mismo nombre, origen e importe.</p>
             <div className="dos">
               <label className="campo">Archivo PDF
                 <input ref={pdfInput} type="file" accept="application/pdf,.pdf" onChange={(e) => { setArchivoPdf(e.target.files?.[0] ?? null); setCandidatos([]); setError(''); setMensajeImportacion('') }} />
               </label>
-              <label className="campo">Mayorista del catálogo <small>(obligatorio · uso interno)</small>
+              <label className="campo">Origen del catálogo <small>(marca, mayorista o proveedor · obligatorio · uso interno)</small>
                 <select required value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)}>
-                  <option value="">Elegí un mayorista…</option>
+                  <option value="">Elegí un origen…</option>
                   {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
-                  <option value={NUEVO_MAYORISTA}>+ Crear nuevo mayorista</option>
+                  <option value={NUEVO_MAYORISTA}>+ Nuevo origen (marca o proveedor)</option>
                 </select>
               </label>
               {proveedorPdf === NUEVO_MAYORISTA && (
-                <label className="campo">Nombre del nuevo mayorista
-                  <input required value={nuevoProveedorPdf} onChange={(e) => setNuevoProveedorPdf(e.target.value)} maxLength={160} placeholder="Ej.: Corralón San Martín" />
+                <label className="campo">Nombre de la marca o proveedor
+                  <input required value={nuevoProveedorPdf} onChange={(e) => setNuevoProveedorPdf(e.target.value)} maxLength={160} placeholder="Ej.: lista de precios de una marca o Corralón San Martín" />
                 </label>
               )}
             </div>
@@ -622,7 +622,7 @@ function FormItem({ item, alCerrar, alGuardar }: { item: Item | null; alCerrar: 
         <label className="campo">Descripción <small>(opcional)</small>
           <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={500} />
         </label>
-        <label className="campo">Proveedor / mayorista <small>(uso interno)</small>
+        <label className="campo">Origen (marca / proveedor) <small>(uso interno)</small>
           <input value={proveedor} onChange={(e) => setProveedor(e.target.value)} maxLength={160} />
         </label>
         <div className="dos">

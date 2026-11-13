@@ -64,10 +64,18 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
     cond: { flex: 1 },
     condTit: { fontFamily: fuentes.titulos, fontWeight: 700, fontSize: 9, color: TINTA, marginBottom: 3 },
     condTxt: { fontSize: 8.5, color: MUTED, lineHeight: 0.95 },
-    total: { width: 210, borderTopWidth: 1.5, borderTopColor: primario, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    total: { borderTopWidth: 1.5, borderTopColor: primario, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     totalEt: { fontSize: 10, color: primario, fontWeight: 700 },
     totalVal: { fontFamily: fuentes.titulos, fontWeight: 700, fontSize: 15, color: primario },
-    sena: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, fontSize: 8.5, color: MUTED },
+    columnaTotal: { width: 210 },
+    senaCaja: { marginTop: 10, borderWidth: 0.75, borderColor: LINEA, borderLeftWidth: 3, borderLeftColor: acento, borderRadius: 5, backgroundColor: NIEBLA, paddingVertical: 7, paddingHorizontal: 9 },
+    senaTit: { fontFamily: fuentes.titulos, fontWeight: 700, fontSize: 8, color: primario, marginBottom: 4 },
+    senaFila: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
+    senaSaldo: { borderTopWidth: 0.5, borderTopColor: LINEA },
+    senaEt: { fontSize: 8.5, color: TINTA, fontWeight: 700 },
+    senaNota: { fontSize: 7, color: MUTED },
+    senaVal: { fontFamily: fuentes.titulos, fontWeight: 700, fontSize: 11, color: primario },
+    senaValSec: { fontSize: 9.5, color: TINTA },
     acentoLinea: { height: 2, width: 36, backgroundColor: acento, marginTop: 8 },
     pie: { position: 'absolute', bottom: 22, left: 40, right: 40, borderTopWidth: 0.75, borderTopColor: LINEA, paddingTop: 6, fontSize: 7.5, color: MUTED },
     pieFila: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -165,14 +173,35 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
             {condiciones !== '' && <Text style={{ ...s.condTxt, marginTop: p.formaPago ? 4 : 0 }}>{condiciones}</Text>}
             {p.notas ? (<><Text style={{ ...s.condTit, marginTop: 8 }}>Notas</Text><Text style={s.condTxt}>{p.notas}</Text></>) : null}
           </View>
-          <View style={s.total}>
-            <Text style={s.totalEt}>Total</Text>
-            <Text style={s.totalVal}>{importeEnMoneda(p.total, p.moneda)}</Text>
+          <View style={s.columnaTotal}>
+            <View style={s.total}>
+              <Text style={s.totalEt}>Total</Text>
+              <Text style={s.totalVal}>{importeEnMoneda(p.total, p.moneda)}</Text>
+            </View>
+            {requiereSena(p.formaPago) && (() => {
+              const sena = Math.round(p.total * 50) / 100
+              const saldo = Math.round((p.total - sena) * 100) / 100
+              return (
+                <View style={s.senaCaja}>
+                  <Text style={s.senaTit}>Forma de pago en dos partes</Text>
+                  <View style={s.senaFila}>
+                    <View>
+                      <Text style={s.senaEt}>Seña al aceptar</Text>
+                      <Text style={s.senaNota}>50% del total</Text>
+                    </View>
+                    <Text style={s.senaVal}>{importeEnMoneda(sena, p.moneda)}</Text>
+                  </View>
+                  <View style={{ ...s.senaFila, ...s.senaSaldo }}>
+                    <View>
+                      <Text style={s.senaEt}>Saldo a la entrega</Text>
+                      <Text style={s.senaNota}>50% restante</Text>
+                    </View>
+                    <Text style={s.senaValSec}>{importeEnMoneda(saldo, p.moneda)}</Text>
+                  </View>
+                </View>
+              )
+            })()}
           </View>
-          {requiereSena(p.formaPago) && <View style={s.sena}>
-            <Text>Seña del 50%</Text>
-            <Text>{importeEnMoneda(Math.round(p.total * 50) / 100, p.moneda)}</Text>
-          </View>}
         </View>
 
         <View fixed style={s.pie}>

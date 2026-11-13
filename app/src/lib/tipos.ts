@@ -4,7 +4,7 @@ export const PERMISOS_EMPRESA = [
   { codigo: 'catalog.view', nombre: 'Ver catálogo' },
   { codigo: 'catalog.manage', nombre: 'Administrar catálogo' },
   { codigo: 'clients.manage', nombre: 'Administrar clientes' },
-  { codigo: 'quotes.create', nombre: 'Crear presupuestos (incluye ver los propios)' },
+  { codigo: 'quotes.create', nombre: 'Crear presupuestos' },
   { codigo: 'quotes.view_own', nombre: 'Ver presupuestos propios' },
   { codigo: 'quotes.view_all', nombre: 'Ver presupuestos de todo el equipo' },
   { codigo: 'quotes.update_own', nombre: 'Editar presupuestos propios' },

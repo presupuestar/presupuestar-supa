@@ -9,6 +9,8 @@ import { fechaCorta } from '../lib/formato'
 import { PERMISOS_EMPRESA, type PermisoEmpresa, type RolEmpresa, type UsuarioEquipo } from '../lib/tipos'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** Ver los presupuestos de todo el equipo queda reservado al administrador. */
+const PERMISOS_ROL = PERMISOS_EMPRESA.filter((permiso) => permiso.codigo !== 'quotes.view_all')
 
 function mensajeErrorRoles(error: unknown): string {
   if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST205') {
@@ -170,15 +172,19 @@ export function Equipo() {
               </label>
               <fieldset className="permisos-rol">
                 <legend>Permisos</legend>
-                {PERMISOS_EMPRESA.map((permiso) => (
-                  <label key={permiso.codigo}>
-                    <input type="checkbox" checked={permisosRol.includes(permiso.codigo)}
-                      onChange={(e) => setPermisosRol((actuales) => e.target.checked
-                        ? [...actuales, permiso.codigo]
-                        : actuales.filter((p) => p !== permiso.codigo))} />
-                    {permiso.nombre}
-                  </label>
-                ))}
+                {PERMISOS_ROL.map((permiso) => {
+                  // Quien crea presupuestos siempre ve los suyos: se marca solo y no se puede quitar.
+                  const implicito = permiso.codigo === 'quotes.view_own' && permisosRol.includes('quotes.create')
+                  return (
+                    <label key={permiso.codigo}>
+                      <input type="checkbox" checked={implicito || permisosRol.includes(permiso.codigo)} disabled={implicito}
+                        onChange={(e) => setPermisosRol((actuales) => e.target.checked
+                          ? [...actuales, permiso.codigo]
+                          : actuales.filter((p) => p !== permiso.codigo))} />
+                      <span>{permiso.nombre}{implicito && <small className="permiso-implicito"> · incluido al crear presupuestos</small>}</span>
+                    </label>
+                  )
+                })}
               </fieldset>
               <div className="botones izq">
                 <button className="btn chico" disabled={rolCargando}>{rolCargando ? 'Guardando…' : 'Guardar rol'}</button>
@@ -188,7 +194,16 @@ export function Equipo() {
           )}
           {roles.length > 0 ? <ul className="lista-roles">{roles.map((rol) => (
             <li key={rol.id}>
-              <span><strong>{rol.nombre}</strong><small>{rol.permisos.map((permiso) => PERMISOS_EMPRESA.find((p) => p.codigo === permiso)?.nombre).filter(Boolean).join(' · ') || 'Sin permisos asignados'}</small></span>
+              <div className="rol-detalle">
+                <strong>{rol.nombre}</strong>
+                {rol.permisos.some((permiso) => PERMISOS_ROL.some((p) => p.codigo === permiso))
+                  ? <ul className="chips-permisos" aria-label={`Permisos de ${rol.nombre}`}>
+                      {PERMISOS_ROL.filter((p) => rol.permisos.includes(p.codigo) ||
+                        (p.codigo === 'quotes.view_own' && rol.permisos.includes('quotes.create')))
+                        .map((p) => <li key={p.codigo}>{p.nombre}</li>)}
+                    </ul>
+                  : <small>Sin permisos asignados</small>}
+              </div>
               <span className="acciones">
                 <button className="link" onClick={() => iniciarEdicionRol(rol)}>Editar</button>
                 <button className="link peligro" onClick={() => void eliminarRol(rol)}>Eliminar</button>
