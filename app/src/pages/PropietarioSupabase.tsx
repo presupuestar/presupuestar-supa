@@ -1,4 +1,5 @@
 import { cerrarConFondo } from '../lib/dialogo'
+import { SelectorArchivo } from '../components/SelectorArchivo'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
@@ -398,11 +399,11 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
       <label className="campo">Color principal<input type="color" value={form.primary_color} onChange={(e) => change('primary_color', e.target.value)} /></label>
       <label className="campo">Color de acento<input type="color" value={form.accent_color} onChange={(e) => change('accent_color', e.target.value)} /></label>
       <div className="campo">Logo actual {form.logo_path ? <img src={assetUrl(form.logo_path)} alt="Logo actual" style={{ display: 'block', maxWidth: 140, maxHeight: 80 }} /> : <small>Sin logo</small>}</div>
-      <label className="campo">Subir logo<input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} /></label>
+      <SelectorArchivo etiqueta="Subir logo" ayuda="(SVG, PNG, JPG o WEBP)" accept="image/svg+xml,image/png,image/jpeg,image/webp" archivo={logo} textoBoton="Elegir imagen" onChange={setLogo} />
       <label className="campo">Tipografía de títulos<input value={form.title_font ?? ''} onChange={(e) => change('title_font', e.target.value)} placeholder="Poppins" /></label>
       <label className="campo">Tipografía de texto<input value={form.text_font ?? ''} onChange={(e) => change('text_font', e.target.value)} placeholder="Poppins" /></label>
-      <label className="campo">Archivo de fuente para títulos<input type="file" accept=".ttf,.otf,.woff,.woff2" onChange={(e) => setTitleFontFile(e.target.files?.[0] ?? null)} />{form.title_font_path && <small>Fuente cargada</small>}</label>
-      <label className="campo">Archivo de fuente para texto<input type="file" accept=".ttf,.otf,.woff,.woff2" onChange={(e) => setTextFontFile(e.target.files?.[0] ?? null)} />{form.text_font_path && <small>Fuente cargada</small>}</label>
+      <SelectorArchivo etiqueta="Archivo de fuente para títulos" ayuda="(TTF, OTF, WOFF o WOFF2)" accept=".ttf,.otf,.woff,.woff2" archivo={titleFontFile} textoBoton="Elegir fuente" actual={form.title_font_path ? 'Fuente cargada' : undefined} onChange={setTitleFontFile} />
+      <SelectorArchivo etiqueta="Archivo de fuente para texto" ayuda="(TTF, OTF, WOFF o WOFF2)" accept=".ttf,.otf,.woff,.woff2" archivo={textFontFile} textoBoton="Elegir fuente" actual={form.text_font_path ? 'Fuente cargada' : undefined} onChange={setTextFontFile} />
     </div>
     {message && <p className={message === 'Cambios guardados.' ? 'sub' : 'error'} role="status">{message}</p>}
     <div className="botones izq"><button className="btn chico" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><button type="button" className="btn sec chico peligro" onClick={onDelete}>Eliminar empresa</button></div>

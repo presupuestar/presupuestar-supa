@@ -1,3 +1,4 @@
+import { SelectorArchivo } from '../components/SelectorArchivo'
 import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Layout } from '../components/Layout'
@@ -477,15 +478,9 @@ export function Catalogo() {
             <span className="catalogo-desplegable-icono" aria-hidden="true" />
           </summary>
           <div className="importador-contenido">
-            <div className="botones importador-acciones">
-              <button type="button" className="btn sec chico" onClick={() => pdfInput.current?.click()}>Importar PDF</button>
-            </div>
-            <p className="ayuda">Leemos catálogos con texto seleccionable y detectamos filas que terminan en un precio. La moneda explícita del PDF (incluida la que aparece junto al precio) prevalece; al reimportar, también corregimos la moneda de registros existentes con el mismo nombre, origen e importe.</p>
-            <div className="dos">
-              <label className="campo">Archivo PDF
-                <input ref={pdfInput} type="file" accept="application/pdf,.pdf" onChange={(e) => { setArchivoPdf(e.target.files?.[0] ?? null); setCandidatos([]); setError(''); setMensajeImportacion('') }} />
-              </label>
-              <label className="campo">Origen del catálogo <small>(marca, mayorista o proveedor · obligatorio · uso interno)</small>
+            <p className="ayuda">Elegí de dónde es la lista de precios y subí el PDF (con texto seleccionable). Detectamos cada ítem con su precio y su moneda; si reimportás, se actualizan los que ya existen con el mismo nombre y origen.</p>
+            <div className="importador-campos">
+              <label className="campo">1. Origen del catálogo <small>(marca, mayorista o proveedor · uso interno)</small>
                 <select required value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)}>
                   <option value="">Elegí un origen…</option>
                   {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -497,11 +492,21 @@ export function Catalogo() {
                   <input required value={nuevoProveedorPdf} onChange={(e) => setNuevoProveedorPdf(e.target.value)} maxLength={160} placeholder="Ej.: lista de precios de una marca o Corralón San Martín" />
                 </label>
               )}
+              <SelectorArchivo
+                ref={pdfInput}
+                etiqueta="2. Archivo PDF"
+                accept="application/pdf,.pdf"
+                archivo={archivoPdf}
+                textoBoton="Elegir PDF"
+                sinArchivo="Todavía no elegiste un archivo"
+                onChange={(archivo) => { setArchivoPdf(archivo); setCandidatos([]); setError(''); setMensajeImportacion('') }}
+              />
             </div>
-            <div className="botones importador-acciones">
-              <button type="button" className="btn sec chico" disabled={!archivoPdf || leyendoPdf || guardandoPdf} onClick={procesarPdf}>
+            <div className="importador-acciones">
+              <button type="button" className="btn chico" disabled={!archivoPdf || leyendoPdf || guardandoPdf} onClick={procesarPdf}>
                 {leyendoPdf ? 'Leyendo PDF…' : 'Leer PDF'}
               </button>
+              {!archivoPdf && <span className="ayuda">Elegí el origen y el archivo para continuar.</span>}
             </div>
             {error && <p className="error" role="alert">{error}</p>}
             {candidatos.length > 0 && (

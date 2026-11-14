@@ -843,3 +843,22 @@ dialog:not(.confirmacion-eliminacion)[open]::backdrop{animation:aparecer 200ms e
   .barra-seleccion-catalogo{gap:8px}
   .barra-seleccion-catalogo .asignar-proveedor{display:grid;gap:8px}
 }
+
+/* Importador de PDF: origen → archivo → leer, en orden y sin huecos */
+.importador-contenido{gap:18px}
+.importador-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:start}
+.importador-acciones{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0}
+.importador-acciones .ayuda{margin:0}
+
+/* Selector de archivo en castellano */
+.selector-archivo>label:first-child{font-size:14px;font-weight:500}
+.selector-archivo-caja{display:flex;align-items:center;gap:12px;min-width:0;padding:6px 6px 6px 6px;border:1.5px dashed var(--linea);border-radius:12px;background:#fff;transition:border-color 150ms ease,background-color 150ms ease}
+.selector-archivo-caja:hover{border-color:color-mix(in srgb,var(--primario) 35%,var(--linea))}
+.selector-archivo-caja.con-archivo{border-style:solid;background:color-mix(in srgb,var(--acento) 7%,#fff)}
+.selector-archivo-caja .btn{flex:none;cursor:pointer}
+.selector-archivo-caja .btn.deshabilitado{opacity:.6;cursor:not-allowed}
+.selector-archivo-nombre{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:14px;font-weight:400}
+.selector-archivo-caja.con-archivo .selector-archivo-nombre{color:var(--tinta);font-weight:500}
+.selector-archivo input:focus-visible+*,.selector-archivo-caja:focus-within{outline:3px solid var(--acento);outline-offset:2px}
+.botones.importador-acciones{justify-content:flex-start}
+.botones.importador-acciones.revision-acciones{justify-content:flex-end}
