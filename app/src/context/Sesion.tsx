@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, supabasePropietario } from '../lib/supabase'
 import { definirAlcancePresupuestos, repositorio } from '../lib/repositorio'
 import { aplicarTema, restablecerTema } from '../lib/tema'
+import { mensajeError } from '../lib/errores'
 import type { Empresa, PermisoEmpresa } from '../lib/tipos'
 
 export interface UsuarioSesion {
@@ -91,7 +92,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         await supabase.auth.signOut({ scope: 'local' })
-        if (vigente) setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo cargar el perfil.')
+        if (vigente) setErrorEmpresa(mensajeError(error, 'No se pudo cargar el perfil.'))
       } finally {
         if (vigente) setCargando(false)
       }
@@ -102,7 +103,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
       return cargar(data.session?.user ?? null)
     }).catch((error: unknown) => {
       if (vigente) {
-        setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo validar la sesión.')
+        setErrorEmpresa(mensajeError(error, 'No se pudo validar la sesión.'))
         setCargando(false)
       }
     })
@@ -133,7 +134,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((error: unknown) => {
-        if (vigente) setErrorEmpresa(error instanceof Error ? error.message : 'No se pudo cargar la empresa.')
+        if (vigente) setErrorEmpresa(mensajeError(error, 'No se pudo cargar la empresa.'))
       })
     return () => { vigente = false }
   }, [usuario?.id, usuario?.empresa])

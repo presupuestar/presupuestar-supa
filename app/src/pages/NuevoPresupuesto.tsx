@@ -185,7 +185,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
       setBusquedaItem('')
       setItemUsdPendiente(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : mensajeError(e, 'No se pudo obtener la cotización del dólar blue. No se agregó el ítem.'))
+      setError(mensajeError(e, 'No se pudo obtener la cotización del dólar blue. No se agregó el ítem.'))
     } finally {
       setConsultandoCotizacion(false)
     }

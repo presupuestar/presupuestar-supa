@@ -6,8 +6,9 @@ import { PERMISOS_EMPRESA, type Cliente, type Empresa, type Estado, type Item, t
 
 type DbRow = Record<string, unknown>
 
-const errorResult = <T>(result: { data: T | null; error: { message: string } | null }): T => {
-  if (result.error) throw new Error(result.error.message)
+const errorResult = <T>(result: { data: T | null; error: { message: string; code?: string } | null }): T => {
+  // Se conserva el código (23505, 42501, PGRST116…) para traducir el error con precisión.
+  if (result.error) throw Object.assign(new Error(result.error.message), { code: result.error.code })
   if (result.data === null) throw new Error('Supabase no devolvió el registro esperado.')
   return result.data
 }

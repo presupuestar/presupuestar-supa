@@ -18,7 +18,6 @@ const claveFilaPdf = (nombre: string, precio: number, moneda: string) =>
 
 function mensajeErrorImportacion(e: unknown): string {
   if (e instanceof ClientResponseError) return mensajeError(e, 'No se pudo sincronizar el ítem.')
-  if (e instanceof Error) return e.message
   return mensajeError(e, 'No se pudo sincronizar el ítem.')
 }
 
@@ -219,10 +218,7 @@ export function Catalogo() {
         if (avisos.length > 0) setMensajeImportacion(avisos.join(' '))
       }
     } catch (e) {
-      const detalle = e instanceof Error && e.message
-        ? e.message
-        : mensajeError(e, 'No se pudo leer el PDF. Probá con un archivo PDF con texto seleccionable.')
-      setError(detalle)
+      setError(mensajeError(e, 'No se pudo leer el PDF. Probá con un archivo PDF con texto seleccionable.'))
     } finally {
       setLeyendoPdf(false)
       setProgresoLectura('')
