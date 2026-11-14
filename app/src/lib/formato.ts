@@ -1,11 +1,19 @@
-export const pesos = (n: number) =>
-  '$ ' + n.toLocaleString('es-AR', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })
+/**
+ * Formato de importe argentino: sin decimales si es un número entero y, si tiene
+ * centavos, siempre con dos (850.000,50 y no 850.000,5).
+ */
+const opcionesImporte = (n: number): Intl.NumberFormatOptions => {
+  const conCentavos = Math.round(Math.abs(n) * 100) % 100 !== 0
+  return { minimumFractionDigits: conCentavos ? 2 : 0, maximumFractionDigits: 2 }
+}
+
+export const pesos = (n: number) => '$ ' + n.toLocaleString('es-AR', opcionesImporte(n))
 
 export const normalizarMoneda = (moneda?: string) => moneda?.trim().toUpperCase() || 'ARS'
 
 export function importeEnMoneda(n: number, moneda?: string): string {
   const codigo = normalizarMoneda(moneda)
-  return `${codigo} ${n.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`
+  return `${codigo} ${n.toLocaleString('es-AR', opcionesImporte(n))}`
 }
 
 /**
@@ -27,8 +35,8 @@ export function parseCantidad(texto: string): number {
   return /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN
 }
 
-/** Número para mostrar dentro de un campo: 150000 → "150.000", 25000.5 → "25.000,5". */
-export const formatearImporte = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: 2 })
+/** Número para mostrar dentro de un campo: 150000 → "150.000", 25000.5 → "25.000,50". */
+export const formatearImporte = (n: number) => n.toLocaleString('es-AR', opcionesImporte(n))
 
 /** Fecha guardada ("2026-10-08 12:00:00.000Z") → "08/10/2026". */
 export const fechaCorta = (f: string) => { const [a, m, d] = f.slice(0, 10).split('-'); return `${d}/${m}/${a}` }

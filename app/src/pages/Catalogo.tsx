@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ClientResponseError } from 'pocketbase'
 import { Layout } from '../components/Layout'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseImporte } from '../lib/formato'
@@ -16,14 +15,11 @@ const claveImportacion = (nombre: string, proveedor: string) =>
 const claveFilaPdf = (nombre: string, precio: number, moneda: string) =>
   `${normalizarClave(nombre)}|${precio}|${normalizarMoneda(moneda)}`
 
-function mensajeErrorImportacion(e: unknown): string {
-  if (e instanceof ClientResponseError) return mensajeError(e, 'No se pudo sincronizar el ítem.')
-  return mensajeError(e, 'No se pudo sincronizar el ítem.')
-}
+const mensajeErrorImportacion = (e: unknown): string => mensajeError(e, 'No se pudo sincronizar el ítem.')
 
 function verificarMonedaPersistida(monedaGuardada: string | undefined, monedaEsperada: string) {
   if (normalizarMoneda(monedaGuardada) !== normalizarMoneda(monedaEsperada)) {
-    throw new Error(`El servidor no guardó la moneda ${normalizarMoneda(monedaEsperada)}. Aplicá las migraciones de PocketBase y volvé a importar; el ítem no se considera sincronizado.`)
+    throw new Error(`El servidor no guardó la moneda ${normalizarMoneda(monedaEsperada)}. Volvé a importar el PDF; si sigue pasando, avisale al administrador. El ítem no se considera sincronizado.`)
   }
 }
 

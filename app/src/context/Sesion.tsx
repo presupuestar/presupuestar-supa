@@ -49,10 +49,16 @@ export function SesionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let vigente = true
+    // Cada cambio de sesión (ingreso, cambio de contraseña, salida) dispara una carga.
+    // Solo vale la última: si una carga anterior termina después, se descarta. Así una
+    // sesión ya cerrada no vuelve a aparecer como iniciada sin credenciales válidas.
+    let ultimaCarga = 0
     const cargar = async (user: User | null) => {
+      const turno = ++ultimaCarga
+      const esActual = () => vigente && turno === ultimaCarga
       if (!user) {
         definirAlcancePresupuestos(null)
-        if (vigente) {
+        if (esActual()) {
           setUsuario(null)
           setEmpresa(null)
           restablecerTema()
@@ -62,6 +68,11 @@ export function SesionProvider({ children }: { children: ReactNode }) {
       }
       try {
         const perfil = await perfilDeUsuario(user)
+        if (!esActual()) return
+        // La sesión pudo cerrarse mientras se cargaba el perfil.
+        const { data: actual } = await supabase.auth.getSession()
+        if (!esActual()) return
+        if (actual.session?.user.id !== user.id) return
         if (perfil.rol === 'propietario') {
           const [{ data: sesionEmpresa }, { data: sesionPropietario }] = await Promise.all([
             supabase.auth.getSession(),
@@ -85,16 +96,18 @@ export function SesionProvider({ children }: { children: ReactNode }) {
           }
           return
         }
-        if (vigente) {
+        if (esActual()) {
           definirAlcancePresupuestos({ usuario: perfil.id, verTodo: perfil.rol === 'admin' })
           setUsuario(perfil)
           setErrorEmpresa('')
         }
       } catch (error) {
+        // Una carga vieja que falla no puede cerrar una sesión más nueva.
+        if (!esActual()) return
         await supabase.auth.signOut({ scope: 'local' })
         if (vigente) setErrorEmpresa(mensajeError(error, 'No se pudo cargar el perfil.'))
       } finally {
-        if (vigente) setCargando(false)
+        if (esActual()) setCargando(false)
       }
     }
 
