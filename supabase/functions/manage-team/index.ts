@@ -76,6 +76,14 @@ Deno.serve(async (request: Request) => {
       user_metadata: { name },
     })
     if (error) return json({ error: error.message }, 400)
+    // Supabase agrega app_metadata después de insertar el usuario: el perfil se completa acá.
+    const { error: profileError } = await adminClient.from('profiles')
+      .update({ company_id: profile.company_id, role, name, email })
+      .eq('user_id', data.user.id)
+    if (profileError) {
+      await adminClient.auth.admin.deleteUser(data.user.id)
+      return json({ error: `No se pudo asignar la empresa al usuario: ${profileError.message}` }, 400)
+    }
     return json({ id: data.user.id })
   }
 
