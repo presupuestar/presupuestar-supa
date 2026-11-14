@@ -888,3 +888,12 @@ dialog:not(.confirmacion-eliminacion)[open]::backdrop{animation:aparecer 200ms e
 
 /* Texto o control solo para lectores de pantalla: nunca ocupa lugar ni desborda */
 .sr{position:absolute!important;width:1px!important;height:1px!important;min-width:0!important;padding:0!important;margin:-1px!important;border:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;white-space:nowrap!important}
+
+/* Inicio sin presupuestos emitidos */
+.inicio-vacio{display:flex;gap:18px;align-items:flex-start;margin-top:8px;padding:26px 28px;background:#fff;border:1px solid var(--linea);border-radius:16px;box-shadow:var(--sombra-caja);animation:subir 360ms var(--curva-salida) backwards}
+.inicio-vacio h2{font-size:19px;margin-bottom:6px}
+.inicio-vacio p{margin:0;max-width:60ch;color:var(--muted);font-size:15px;line-height:1.55}
+.inicio-vacio .botones.izq{margin-top:16px}
+.inicio-vacio-icono{position:relative;flex:none;width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--acento) 16%,#fff)}
+.inicio-vacio-icono::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(var(--primario),var(--primario)) 12px 24px/5px 9px no-repeat,linear-gradient(var(--primario),var(--primario)) 20px 18px/5px 15px no-repeat,linear-gradient(var(--acento),var(--acento)) 28px 13px/5px 20px no-repeat}
+@media (max-width:620px){.inicio-vacio{flex-direction:column;gap:12px;padding:20px 18px}}

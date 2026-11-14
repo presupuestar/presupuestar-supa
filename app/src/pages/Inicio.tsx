@@ -17,7 +17,10 @@ export function Inicio() {
   const { empresa, usuario } = useSesion()
   const [meses, setMeses] = useState<ResumenMes[]>([])
   const [caducados, setCaducados] = useState(0)
+  const [borradores, setBorradores] = useState(0)
+  const [cargado, setCargado] = useState(false)
   const [error, setError] = useState('')
+  const puedeVer = tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')
 
   useEffect(() => {
     if (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) {
@@ -25,6 +28,8 @@ export function Inicio() {
         .then((l) => {
           setMeses(repositorio.resumenMensual(l))
           setCaducados(l.filter((p) => presupuestoCaducado(p, empresa?.validezDias)).length)
+          setBorradores(l.filter((p) => p.estado === 'borrador').length)
+          setCargado(true)
         })
         .catch((e) => setError(mensajeError(e, 'No se pudo cargar el resumen de presupuestos.')))
     }
@@ -66,7 +71,24 @@ export function Inicio() {
           </p>
         )}
 
-        {mes && (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && (
+        {cargado && !mes && puedeVer && (
+          <section className="inicio-vacio">
+            <span className="inicio-vacio-icono" aria-hidden="true" />
+            <div>
+              <h2>{tienePermiso(usuario, 'quotes.view_all') ? 'Todavía no hay presupuestos emitidos' : 'Todavía no emitiste presupuestos'}</h2>
+              <p>
+                {borradores > 0
+                  ? `Tenés ${borradores === 1 ? '1 borrador guardado' : `${borradores} borradores guardados`}. Los borradores no cuentan en el resumen: cuando ${borradores === 1 ? 'lo emitas' : 'los emitas'}, acá vas a ver el panorama del mes.`
+                  : 'Cuando emitas el primero, acá vas a ver el panorama del mes: cuánto presupuestaste, qué se aceptó y qué sigue pendiente.'}
+              </p>
+              {borradores > 0 && <div className="botones izq">
+                <Link className="btn sec chico" to="/historial">Ver {borradores === 1 ? 'el borrador' : 'los borradores'}</Link>
+              </div>}
+            </div>
+          </section>
+        )}
+
+        {mes && puedeVer && (
           <section className="resumen">
             <div className="encabezado"><h2>Panorama de {nombreMes(mes.mes)}</h2><Link className="link" to="/historial">Ver historial</Link></div>
             <div className="resumen-mes">
