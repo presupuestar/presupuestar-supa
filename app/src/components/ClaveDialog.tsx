@@ -1,3 +1,4 @@
+import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { generarClave } from '../lib/clave'
 import { mensajeError } from '../lib/errores'
@@ -21,7 +22,7 @@ export function ClaveDialog({ titulo, alCerrar, alGuardar }: Props) {
   }
 
   return (
-    <dialog ref={ref} onClose={alCerrar} onClick={(e) => { if (e.target === ref.current) ref.current?.close() }}>
+    <dialog ref={ref} onClose={alCerrar} {...cerrarConFondo(() => { if (!guardando) ref.current?.close() })}>
       <form onSubmit={enviar} className="form">
         <h2>{titulo}</h2>
         <label className="campo">Contraseña nueva

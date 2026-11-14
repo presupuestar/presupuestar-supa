@@ -1,3 +1,4 @@
+import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Layout } from '../components/Layout'
 import { repositorio } from '../lib/repositorio'
@@ -402,7 +403,7 @@ export function Catalogo() {
           aria-labelledby="confirmacion-eliminacion-titulo"
           aria-describedby="confirmacion-eliminacion-descripcion"
           onClose={() => setConfirmarEliminacion(false)}
-          onClick={(e) => { if (e.target === confirmacionRef.current) confirmacionRef.current?.close() }}
+          {...cerrarConFondo(() => confirmacionRef.current?.close())}
         >
           <div className="confirmacion-eliminacion-tarjeta">
             <h2 id="confirmacion-eliminacion-titulo">¿Eliminar los ítems seleccionados?</h2>
@@ -605,7 +606,7 @@ function FormItem({ item, alCerrar, alGuardar }: { item: Item | null; alCerrar: 
   }
 
   return (
-    <dialog ref={ref} onClose={alCerrar} onClick={(e) => { if (e.target === ref.current) ref.current?.close() }}>
+    <dialog ref={ref} onClose={alCerrar} {...cerrarConFondo(() => ref.current?.close())}>
       <form onSubmit={enviar} className="form">
         <h2>{item ? 'Editar ítem' : 'Nuevo ítem'}</h2>
         <label className="campo">Nombre

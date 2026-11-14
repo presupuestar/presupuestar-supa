@@ -1,3 +1,4 @@
+import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useRef, useState } from 'react'
 import { LEYENDA_FISCAL } from '../lib/legal'
 
@@ -24,7 +25,7 @@ export function EnlacesLegales() {
           className="ventana legal"
           aria-labelledby="titulo-legal"
           onClose={() => setDocumento(null)}
-          onClick={(event) => { if (event.target === dialog.current) dialog.current?.close() }}
+          {...cerrarConFondo(() => dialog.current?.close())}
         >
           <div className="form">
             {documento === 'terminos' ? <Terminos /> : <Privacidad />}

@@ -1,3 +1,4 @@
+import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
@@ -316,7 +317,7 @@ export function PropietarioSupabase() {
         aria-describedby="eliminar-empresa-descripcion"
         onClose={() => setConfirmDelete(false)}
         onCancel={(event) => { if (busy) event.preventDefault() }}
-        onClick={(event) => { if (event.target === deleteDialog.current && !busy) deleteDialog.current?.close() }}
+        {...cerrarConFondo(() => { if (!busy) deleteDialog.current?.close() })}
       ><div className="form">
         <h2 id="eliminar-empresa-titulo">Eliminar {company.name}</h2><p id="eliminar-empresa-descripcion">Se eliminarán permanentemente la empresa, sus usuarios y sus datos. Esta acción no se puede deshacer.</p>
         {error && <p className="error" role="alert">{error}</p>}

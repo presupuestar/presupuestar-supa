@@ -1,3 +1,4 @@
+import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSesion } from '../context/Sesion'
 import { mensajeError } from '../lib/errores'
@@ -41,7 +42,7 @@ export function PrimerAccesoDialog() {
   }
 
   return (
-    <dialog ref={ref} className="primer-acceso-dialog" onCancel={(e) => { e.preventDefault(); void responder() }} onClick={(e) => { if (e.target === ref.current) void responder() }}>
+    <dialog ref={ref} className="primer-acceso-dialog" onCancel={(e) => { e.preventDefault(); void responder() }} {...cerrarConFondo(() => { if (!guardando) void responder() })}>
       <form onSubmit={enviar} className="form">
         <button className="primer-acceso-cerrar" type="button" aria-label="Cerrar" title="Cerrar" disabled={guardando} onClick={() => void responder()}>×</button>
         <h2>¿Querés cambiar tu contraseña?</h2>
