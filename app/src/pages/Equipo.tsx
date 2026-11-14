@@ -4,6 +4,7 @@ import { ClaveDialog } from '../components/ClaveDialog'
 import { useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { generarClave } from '../lib/clave'
+import { faltaUrlPublica, urlPublica } from '../lib/urlPublica'
 import { mensajeError } from '../lib/errores'
 import { fechaCorta } from '../lib/formato'
 import { PERMISOS_EMPRESA, type PermisoEmpresa, type RolEmpresa, type UsuarioEquipo } from '../lib/tipos'
@@ -46,7 +47,7 @@ export function Equipo() {
   useEffect(() => { cargarRoles() }, [])
 
   const mensajeAcceso = (n: string, correo: string, c: string) =>
-    `Hola${n ? ' ' + n.split(' ')[0] : ''}! Ya podés ingresar a PresupuestAR para armar presupuestos${empresa ? ' de ' + empresa.nombre : ''}.\nEntrá desde ${location.origin}\nCorreo: ${correo}\nContraseña: ${c}`
+    `Hola${n ? ' ' + n.split(' ')[0] : ''}! Ya podés ingresar a PresupuestAR para armar presupuestos${empresa ? ' de ' + empresa.nombre : ''}.\nEntrá desde ${urlPublica()}\nCorreo: ${correo}\nContraseña: ${c}`
 
   const crear = async (ev: FormEvent) => {
     ev.preventDefault()
@@ -126,6 +127,7 @@ export function Equipo() {
         {aviso && (
           <section className="aviso" role="status">
             <p>{aviso.texto}</p>
+            {faltaUrlPublica() && <p className="error">Ojo: estás en localhost, así que el enlace de abajo solo funciona en esta computadora. Pasale a la persona la dirección de la web publicada (Vercel).</p>}
             <pre>{aviso.copiar}</pre>
             <div className="botones izq">
               <button className="btn chico" onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar datos de acceso'}</button>

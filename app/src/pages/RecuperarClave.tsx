@@ -1,3 +1,5 @@
+import { urlPublica } from '../lib/urlPublica'
+import { mensajeError } from '../lib/errores'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Isotipo } from '../components/Isotipo'
@@ -17,12 +19,12 @@ export function RecuperarClave() {
     setEnviando(true)
     try {
       const { error: resetError } = await auth.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/restablecer${propietario ? '?owner=1' : ''}`,
+        redirectTo: `${urlPublica()}/restablecer${propietario ? '?owner=1' : ''}`,
       })
       if (resetError) throw resetError
       setEnviado(true)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo enviar el correo.')
+      setError(mensajeError(reason, 'No se pudo enviar el correo.'))
     } finally {
       setEnviando(false)
     }

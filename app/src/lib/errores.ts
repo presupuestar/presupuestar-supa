@@ -2,7 +2,8 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 
 /** Mensajes de Supabase Auth en inglés que conviene explicar en castellano. */
 const TRADUCCIONES: [RegExp, string][] = [
-  [/invalid login credentials/i, 'Correo o contraseña incorrectos.'],
+  [/jwt|token (?:has )?expired|invalid (?:refresh )?token|otp_expired|flow state|code verifier/i, 'La sesión o el enlace ya no es válido. Volvé a ingresar o pedí un enlace nuevo.'],
+  [/invalid login credentials/i,'Correo o contraseña incorrectos.'],
   [/email not confirmed/i, 'El correo de esta cuenta todavía no está confirmado.'],
   [/already (?:been )?registered|already exists|email_exists/i, 'Ya existe una cuenta con ese correo electrónico.'],
   [/should be different from the old password|same_password/i, 'La contraseña nueva tiene que ser distinta de la actual.'],
@@ -10,7 +11,9 @@ const TRADUCCIONES: [RegExp, string][] = [
   [/password should be at least (\d+) characters/i, 'La contraseña es demasiado corta para la configuración de seguridad de Supabase.'],
   [/known to be weak|weak_password|pwned/i, 'Esa contraseña es demasiado común o fue filtrada. Elegí otra.'],
   [/reauthentication|reauthenticate/i, 'Por seguridad, cerrá sesión, volvé a ingresar y cambiá la contraseña enseguida.'],
-  [/rate limit|too many requests/i, 'Hubo demasiados intentos seguidos. Esperá unos minutos y probá de nuevo.'],
+  [/error sending .*email|smtp/i, 'Supabase no pudo enviar el correo. Revisá la configuración de SMTP del proyecto.'],
+  [/email rate limit/i, 'Se alcanzó el límite de correos por hora de Supabase. Probá más tarde o configurá un SMTP propio.'],
+  [/rate limit|too many requests/i,'Hubo demasiados intentos seguidos. Esperá unos minutos y probá de nuevo.'],
   [/database error (?:creating|saving) new user/i, 'Supabase no pudo crear el perfil del usuario. Revisá que las migraciones de la base estén aplicadas.'],
   [/failed to fetch|networkerror|load failed/i, 'No hay conexión con el servidor. Revisá tu internet y probá de nuevo.'],
 ]
