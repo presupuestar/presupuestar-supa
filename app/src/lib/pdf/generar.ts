@@ -11,10 +11,16 @@ export async function logoComoPng(empresa: Empresa): Promise<LogoPng | undefined
   const url = repositorio.empresa.archivoUrl(empresa, empresa.logo)
   if (!url) return undefined
   try {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.src = url
-    await img.decode()
+    // No se usa img.decode(): en algunas pestañas en segundo plano nunca termina y el PDF
+    // quedaba «Generando…» para siempre. Si el logo no carga en 10 s, va la inicial.
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const imagen = new Image()
+      const limite = window.setTimeout(() => reject(new Error('El logo tardó demasiado.')), 10_000)
+      imagen.crossOrigin = 'anonymous'
+      imagen.onload = () => { window.clearTimeout(limite); resolve(imagen) }
+      imagen.onerror = () => { window.clearTimeout(limite); reject(new Error('No se pudo leer el logo.')) }
+      imagen.src = url
+    })
     const ancho = img.naturalWidth || 300, alto = img.naturalHeight || 100
     const k = Math.min(1, 600 / ancho)
     const canvas = document.createElement('canvas')

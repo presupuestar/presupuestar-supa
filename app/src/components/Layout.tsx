@@ -23,9 +23,9 @@ export function Layout({ children }: { children: ReactNode }) {
         </button>
         <nav id="navegacion-principal" className={menuAbierto ? 'menu-abierto' : ''} aria-label="Principal" onClick={() => setMenuAbierto(false)}>
           <NavLink to="/" end className={clase}>Inicio</NavLink>
-          <NavLink to="/catalogo" className={clase}>Catálogo</NavLink>
-          <NavLink to="/nuevo" className={clase}>Nuevo presupuesto</NavLink>
-          <NavLink to="/historial" className={clase}>Historial</NavLink>
+          {tienePermiso(usuario, 'catalog.view') && <NavLink to="/catalogo" className={clase}>Catálogo</NavLink>}
+          {tienePermiso(usuario, 'quotes.create') && <NavLink to="/nuevo" className={clase}>Nuevo presupuesto</NavLink>}
+          {(tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) && <NavLink to="/historial" className={clase}>Historial</NavLink>}
           {tienePermiso(usuario, 'clients.manage') && <NavLink to="/clientes" className={clase}>Clientes</NavLink>}
           {usuario?.rol === 'admin' && <NavLink to="/equipo" className={clase}>Equipo</NavLink>}
           <span className="menu-usuario">

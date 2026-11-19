@@ -154,7 +154,7 @@ export function Inicio() {
             <ul className="ultimos-lista">
               {ultimos.map((p) => {
                 const cliente = p.clienteDatos?.nombre || 'Sin cliente'
-                const destino = sePuedeEditar(p.estado) ? `/presupuestos/${p.id}/editar` : '/historial'
+                const destino = sePuedeEditar(p.estado) && tienePermiso(usuario, 'quotes.update_own') && (usuario?.rol === 'admin' || p.vendedor === usuario?.id) ? `/presupuestos/${p.id}/editar` : '/historial'
                 const caducado = presupuestoCaducado(p, empresa?.validezDias)
                 return (
                   <li key={p.id}>

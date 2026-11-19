@@ -102,7 +102,7 @@ export function RestablecerClave() {
         {!listo ? (
           <div className="form">
             <h2>Enlace pendiente o vencido</h2>
-            <p>{error || 'Abrí el enlace más reciente que recibiste. Si venció, solicita uno nuevo.'}</p>
+            <p>{error || 'Abrí el enlace más reciente que recibiste. Si venció, pedí uno nuevo.'}</p>
             <Link className="link" to={propietario ? '/recuperar?owner=1' : '/recuperar'}>Solicitar otro enlace</Link>
           </div>
         ) : (

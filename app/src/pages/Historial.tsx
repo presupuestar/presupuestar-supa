@@ -65,6 +65,8 @@ export function Historial() {
   const esAdmin = usuario?.rol === 'admin'
   const puedeEliminar = (presupuesto: Presupuesto) =>
     tienePermiso(usuario, 'quotes.delete_own') && (esAdmin || presupuesto.vendedor === usuario?.id)
+  const puedeModificar = (presupuesto: Presupuesto) =>
+    tienePermiso(usuario, 'quotes.update_own') && (esAdmin || presupuesto.vendedor === usuario?.id)
   const [lista, setLista] = useState<Presupuesto[] | null>(null)
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -318,10 +320,11 @@ export function Historial() {
                   <td className="campo-total num" data-label="Total"><Importe valor={p.total} moneda={p.moneda} /></td>
                   <td className="campo-estado" data-label="Estado">
                     {presupuestoCaducado(p, empresa?.validezDias, ahora)
-                      ? <><span className="pill caducado" aria-label={`Presupuesto ${p.numero} caducado`}>Caducado · venció el {fechaCorta(fechaVigencia(p.fechaEmision, p.validezDias ?? empresa?.validezDias, p.vigenteHasta))}</span><select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Cambiar estado del presupuesto ${p.numero}`}
+                      ? <><span className="pill caducado" aria-label={`Presupuesto ${p.numero} caducado`}>Caducado · venció el {fechaCorta(fechaVigencia(p.fechaEmision, p.validezDias ?? empresa?.validezDias, p.vigenteHasta))}</span>{puedeModificar(p) && <select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Cambiar estado del presupuesto ${p.numero}`}
                         onChange={(e) => cambiarEstado(p, e.target.value as Estado)}>
                         {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
-                      </select></>
+                      </select>}</>
+                      : !puedeModificar(p) ? <span className={`estado-sel estado-fijo ${p.estado}`}>{ETIQUETA[p.estado]}</span>
                       : <select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Estado del presupuesto ${p.numero}`}
                       onChange={(e) => cambiarEstado(p, e.target.value as Estado)}>
                       {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
@@ -331,7 +334,7 @@ export function Historial() {
                   <td className="campo-acciones">
                     <div className="acciones-historial">
                       <button className="accion-historial" disabled={generando === p.id} onClick={() => descargar(p)}>{generando === p.id ? 'Generando…' : 'PDF'}</button>
-                      {sePuedeEditar(p.estado) && <Link className="accion-historial" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
+                      {sePuedeEditar(p.estado) && puedeModificar(p) && <Link className="accion-historial" to={`/presupuestos/${p.id}/editar`}>Editar</Link>}
                       {puedeEliminar(p) && <button className="accion-historial peligro" onClick={() => eliminar(p)}>Eliminar</button>}
                     </div>
                   </td>

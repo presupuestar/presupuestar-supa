@@ -4,6 +4,7 @@ import { SelectorArchivo } from '../components/SelectorArchivo'
 import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Layout } from '../components/Layout'
+import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { formatearImporte, importeEnMoneda, normalizarMoneda, parseImporte } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
@@ -40,6 +41,9 @@ interface CandidatoImportacion {
 
 export function Catalogo() {
   const { confirmar, avisar } = useAvisos()
+  const { usuario } = useSesion()
+  // Sin «Administrar catálogo» se puede consultar, pero no cargar, editar ni importar.
+  const puedeAdministrar = tienePermiso(usuario, 'catalog.manage')
   const pdfInput = useRef<HTMLInputElement>(null)
   const revisionFinal = useRef<HTMLDivElement>(null)
   const botonAprobar = useRef<HTMLButtonElement>(null)
@@ -378,9 +382,9 @@ export function Catalogo() {
             <h1>Catálogo</h1>
             <p className="sub">Los ítems que cargás una vez y después elegís al armar cada presupuesto.</p>
           </div>
-          <div className="encabezado-acciones">
+          {puedeAdministrar && <div className="encabezado-acciones">
             <button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Nuevo ítem</button>
-          </div>
+          </div>}
         </div>
 
         <div className="filtros">
@@ -398,7 +402,7 @@ export function Catalogo() {
           <button type="button" className="btn sec chico" disabled={paginaItems >= paginasItems - 1} onClick={() => setPaginaItems((pagina) => Math.min(paginasItems - 1, pagina + 1))}>Siguiente</button>
         </div>}
 
-        <div className="barra-seleccion-catalogo" aria-label="Acciones de selección">
+        {puedeAdministrar && <div className="barra-seleccion-catalogo" aria-label="Acciones de selección">
           <span className="seleccion-conteo">{cantidadSeleccionada} seleccionado{cantidadSeleccionada === 1 ? '' : 's'}</span>
           <button type="button" className="btn sec chico" disabled={visibles.length === 0 || procesandoLote || confirmarEliminacion} onClick={() => seleccionarVisibles(!todosVisiblesSeleccionados)}>
             {todosVisiblesSeleccionados ? 'Quitar resultados' : 'Seleccionar resultados'}
@@ -414,7 +418,7 @@ export function Catalogo() {
           <button type="button" className="btn sec chico peligro-catalogo" disabled={cantidadSeleccionada === 0 || procesandoLote || confirmarEliminacion} onClick={() => ejecutarSeleccion('eliminar')}>
             {procesandoLote ? 'Procesando…' : 'Eliminar'}
           </button>
-        </div>
+        </div>}
 
         <dialog
           ref={confirmacionRef}
@@ -441,7 +445,7 @@ export function Catalogo() {
         {secciones.length === 0 ? (
           items === null ? <div className="tabla-caja cargando-caja"><span className="sr">Cargando…</span>{[0, 1, 2].map((i) => <span className="fila-cargando-linea" key={i}><Silueta ancho="40%" /><Silueta ancho="20%" /><Silueta ancho="12%" /></span>)}</div>
           : items.length === 0 ? <EstadoVacio icono="catalogo" titulo="Tu catálogo está vacío"
-              acciones={<><button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Cargar un ítem</button><button type="button" className="btn sec chico" onClick={() => { if (importadorPdf.current) { importadorPdf.current.open = true; importadorPdf.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) } }}>Importar desde PDF</button></>}>
+              acciones={puedeAdministrar && <><button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Cargar un ítem</button><button type="button" className="btn sec chico" onClick={() => { if (importadorPdf.current) { importadorPdf.current.open = true; importadorPdf.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) } }}>Importar desde PDF</button></>}>
               Cargá los productos o servicios que vendés con su precio. Después los elegís al armar cada presupuesto.
             </EstadoVacio>
           : <div className="tabla-caja"><p className="vacio">No hay ítems que coincidan con la búsqueda o el filtro.</p></div>
@@ -459,14 +463,14 @@ export function Catalogo() {
               {productos.map((i) => (
                 <tr key={i.id} className={`${i.activo ? '' : 'apagado'}${seleccionados.has(i.id) ? ' seleccionado' : ''}`}>
                   <td className="catalogo-nombre">
-                    <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i.id, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>
+                    {puedeAdministrar && <label className="seleccionar-item"><input type="checkbox" checked={seleccionados.has(i.id)} disabled={confirmarEliminacion || procesandoLote} onChange={(e) => cambiarSeleccion(i.id, e.target.checked)} aria-label={`Seleccionar ${i.nombre}`} /><span className="sr">Seleccionar</span></label>}
                     <span className="catalogo-identidad"><strong>{i.nombre}</strong>{i.descripcion && <small>{i.descripcion}</small>}</span>
                   </td>
                   <td className="catalogo-proveedor" data-label="Origen (marca / proveedor)">{i.proveedor?.trim() || <span className="sin-dato">Sin asignar</span>}</td>
                   <td className="catalogo-unidad" data-label="Unidad">{i.unidad || '—'}</td>
                   <td className="catalogo-precio num" data-label="Precio">{importeEnMoneda(i.precio, i.moneda)}</td>
                   <td className="catalogo-estado" data-label="Estado"><span className={`pill ${i.activo ? 'on' : 'off'}`}>{i.activo ? 'Activo' : 'Desactivado'}</span></td>
-                  <td className="catalogo-acciones-fila">
+                  <td className="catalogo-acciones-fila">{puedeAdministrar && <>
                     <button className="link" onClick={() => setEditando(i)}>Editar</button>
                     <details className="catalogo-menu-fila">
                       <summary>Más</summary>
@@ -475,7 +479,7 @@ export function Catalogo() {
                         <button className="link peligro" onClick={() => eliminar(i)}>Eliminar</button>
                       </div>
                     </details>
-                  </td>
+                  </>}</td>
                 </tr>
               ))}
             </tbody>
@@ -484,7 +488,7 @@ export function Catalogo() {
         </details>
         ))}
 
-        <details className="panel importador-pdf catalogo-desplegable" id="pdf-catalogo" ref={importadorPdf}>
+        {puedeAdministrar && <details className="panel importador-pdf catalogo-desplegable" id="pdf-catalogo" ref={importadorPdf}>
           <summary className="catalogo-desplegable-resumen" onClick={(e) => {
             if (leyendoPdf || guardandoPdf) e.preventDefault()
           }}>
@@ -597,7 +601,7 @@ export function Catalogo() {
             </div>}
             {mensajeImportacion && candidatos.length === 0 && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
           </div>
-        </details>
+        </details>}
       </main>
 
       {editando && (
