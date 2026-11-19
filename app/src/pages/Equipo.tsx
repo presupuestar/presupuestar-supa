@@ -7,7 +7,7 @@ import { ClaveDialog } from '../components/ClaveDialog'
 import { useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
 import { generarClave } from '../lib/clave'
-import { faltaUrlPublica, urlPublica } from '../lib/urlPublica'
+import { advertenciaAcceso, mensajeBienvenida, mensajeClaveNueva } from '../lib/bienvenida'
 import { mensajeError } from '../lib/errores'
 import { fechaCorta } from '../lib/formato'
 import { PERMISOS_EMPRESA, type PermisoEmpresa, type RolEmpresa, type UsuarioEquipo } from '../lib/tipos'
@@ -26,10 +26,9 @@ function mensajeErrorRoles(error: unknown): string {
 /** El administrador de la empresa crea y gestiona a sus empleados. */
 export function Equipo() {
   const { usuario, empresa } = useSesion()
-  const { confirmar, avisar } = useAvisos()
+  const { confirmar, avisar, mostrarDatos } = useAvisos()
   const [lista, setLista] = useState<UsuarioEquipo[] | null>(null)
   const [error, setError] = useState('')
-  const [aviso, setAviso] = useState<{ texto: string; copiar: string } | null>(null)
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [clave, setClave] = useState(generarClave())
@@ -43,15 +42,12 @@ export function Equipo() {
   const [rolCargando, setRolCargando] = useState(false)
   const [rolGuardandoUsuario, setRolGuardandoUsuario] = useState<string | null>(null)
   const [claveDe, setClaveDe] = useState<UsuarioEquipo | null>(null)
-  const [copiado, setCopiado] = useState(false)
 
   const cargar = () => repositorio.usuarios.listar().then(setLista).catch((e) => { setLista([]); setError(mensajeError(e, 'No se pudo cargar el equipo.')) })
   const cargarRoles = () => repositorio.roles.listar().then(setRoles).catch((e) => setError(mensajeErrorRoles(e)))
   useEffect(() => { cargar() }, [])
   useEffect(() => { cargarRoles() }, [])
 
-  const mensajeAcceso = (n: string, correo: string, c: string) =>
-    `Hola${n ? ' ' + n.split(' ')[0] : ''}! Ya podés ingresar a PresupuestAR para armar presupuestos${empresa ? ' de ' + empresa.nombre : ''}.\nEntrá desde ${urlPublica()}\nCorreo: ${correo}\nContraseña: ${c}`
 
   const crear = async (ev: FormEvent) => {
     ev.preventDefault()
@@ -61,8 +57,13 @@ export function Equipo() {
     setError(''); setGuardando(true)
     try {
       await repositorio.usuarios.crear({ name: nombre.trim(), email: email.trim(), password: clave, role: rolNuevoUsuario })
-      setAviso({ texto: `${nombre.trim()} ya puede ingresar. Copiá los datos de acceso y pasáselos: la contraseña no se vuelve a mostrar.`, copiar: mensajeAcceso(nombre.trim(), email.trim(), clave) })
-      setNombre(''); setEmail(''); setClave(generarClave()); setVerClave(false); setRolNuevoUsuario('member'); setCopiado(false)
+      void mostrarDatos({
+        titulo: `${nombre.trim()} ya puede entrar`,
+        mensaje: 'Copiá este mensaje de bienvenida y mandáselo por WhatsApp o correo.',
+        datos: mensajeBienvenida({ nombre: nombre.trim(), empresa: empresa?.nombre, email: email.trim(), clave, rol: rolNuevoUsuario }),
+        advertencia: advertenciaAcceso(),
+      })
+      setNombre(''); setEmail(''); setClave(generarClave()); setVerClave(false); setRolNuevoUsuario('member')
       await cargar()
     } catch (e) { setError(mensajeError(e, 'No se pudo crear el empleado.')) }
     finally { setGuardando(false) }
@@ -113,10 +114,6 @@ export function Equipo() {
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar al empleado.')) }
   }
 
-  const copiar = async () => {
-    if (!aviso) return
-    try { await navigator.clipboard.writeText(aviso.copiar); setCopiado(true) } catch { setError('No se pudo copiar. Seleccioná el texto a mano.') }
-  }
 
   if (usuario?.rol !== 'admin') {
     return <Layout><main className="contenido"><h1>Equipo</h1><p className="sub">Solo el administrador de la empresa puede gestionar el equipo.</p></main></Layout>
@@ -130,17 +127,6 @@ export function Equipo() {
 
         {error && <p className="error" role="alert">{error}</p>}
 
-        {aviso && (
-          <section className="aviso" role="status">
-            <p>{aviso.texto}</p>
-            {faltaUrlPublica() && <p className="error">Ojo: estás en localhost, así que el enlace de abajo solo funciona en esta computadora. Pasale a la persona la dirección de la web publicada (Vercel).</p>}
-            <pre>{aviso.copiar}</pre>
-            <div className="botones izq">
-              <button className="btn chico" onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar datos de acceso'}</button>
-              <button className="btn sec chico" onClick={() => setAviso(null)}>Cerrar</button>
-            </div>
-          </section>
-        )}
 
         <section className="panel">
           <h2>Nuevo empleado</h2>
@@ -258,8 +244,12 @@ export function Equipo() {
           alCerrar={() => setClaveDe(null)}
           alGuardar={async (c) => {
             await repositorio.usuarios.restablecerClave(claveDe.id, c)
-            setAviso({ texto: `Listo: la contraseña de ${claveDe.name || claveDe.email} cambió. Pasale los datos nuevos.`, copiar: mensajeAcceso(claveDe.name ?? '', claveDe.email, c) })
-            setCopiado(false)
+            void mostrarDatos({
+              titulo: `Contraseña de ${claveDe.name || claveDe.email} cambiada`,
+              mensaje: 'Copiá este mensaje y mandáselo.',
+              datos: mensajeClaveNueva({ nombre: claveDe.name, email: claveDe.email, clave: c }),
+              advertencia: advertenciaAcceso(),
+            })
           }}
         />
       )}

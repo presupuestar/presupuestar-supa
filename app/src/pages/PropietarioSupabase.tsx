@@ -8,6 +8,7 @@ import { ClaveDialog } from '../components/ClaveDialog'
 import { Isotipo } from '../components/Isotipo'
 import { VolverArriba } from '../components/PreferenciasVisuales'
 import { generarClave } from '../lib/clave'
+import { advertenciaAcceso, mensajeBienvenida, mensajeClaveNueva } from '../lib/bienvenida'
 import { errorDeFuncion, mensajeError } from '../lib/errores'
 import { fechaCorta } from '../lib/formato'
 import { supabasePropietario as supabase } from '../lib/supabase'
@@ -210,7 +211,12 @@ export function PropietarioSupabase() {
         company: { name: companyName.trim(), primary_color: '#0B2545', accent_color: '#5BB5F0', show_seal: true },
         admin: { name: adminName.trim(), email: adminEmail.trim(), password: adminPassword },
       })
-      void mostrarDatos({ titulo: 'Empresa creada', mensaje: 'Pasale estos datos al administrador de la empresa por un canal privado.', datos: `Administrador: ${adminEmail.trim()}\nContraseña inicial: ${adminPassword}`, advertencia: 'La contraseña no se vuelve a mostrar.' })
+      void mostrarDatos({
+        titulo: `${companyName.trim()} ya está lista`,
+        mensaje: 'Copiá este mensaje de bienvenida y mandáselo a quien administra la empresa.',
+        datos: mensajeBienvenida({ nombre: adminName.trim(), empresa: companyName.trim(), email: adminEmail.trim(), clave: adminPassword, rol: 'admin' }),
+        advertencia: advertenciaAcceso(),
+      })
       setShowCreate(false)
       setCompanyName('')
       setAdminName('')
@@ -276,7 +282,7 @@ export function PropietarioSupabase() {
           </nav>
           {error && <p className="error" role="alert">{error}</p>}
           {tab === 'datos' && <CompanySettings company={company} saveCompany={setCompany} onError={setError} onDelete={() => setConfirmDelete(true)} />}
-          {tab === 'usuarios' && <CompanyUsers companyId={company.id} onError={setError} />}
+          {tab === 'usuarios' && <CompanyUsers companyId={company.id} companyName={company.name} onError={setError} />}
         </main>
       ) : id ? (
         <main className="contenido ancho">{error ? <p className="error" role="alert">{error}</p> : <p className="sub">Cargando empresa…</p>}</main>
@@ -414,7 +420,7 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
   </form>
 }
 
-function CompanyUsers({ companyId, onError }: { companyId: string; onError: (message: string) => void }) {
+function CompanyUsers({ companyId, companyName, onError }: { companyId: string; companyName: string; onError: (message: string) => void }) {
   const { confirmar, avisar, mostrarDatos } = useAvisos()
   const [users, setUsers] = useState<UserRow[] | null>(null)
   const [name, setName] = useState('')
@@ -434,7 +440,12 @@ function CompanyUsers({ companyId, onError }: { companyId: string; onError: (mes
     event.preventDefault(); setBusy(true); onError('')
     try {
       await platformAction({ action: 'create-company-user', companyId, email: email.trim(), password, name: name.trim(), role })
-      void mostrarDatos({ titulo: 'Usuario creado', mensaje: 'Pasale estos datos por un canal privado.', datos: `Correo: ${email.trim()}\nContraseña inicial: ${password}`, advertencia: 'La contraseña no se vuelve a mostrar.' })
+      void mostrarDatos({
+        titulo: `${name.trim()} ya puede entrar`,
+        mensaje: 'Copiá este mensaje de bienvenida y mandáselo por WhatsApp o correo.',
+        datos: mensajeBienvenida({ nombre: name.trim(), empresa: companyName, email: email.trim(), clave: password, rol: role }),
+        advertencia: advertenciaAcceso(),
+      })
       setName(''); setEmail(''); setPassword(generarClave()); await load()
     } catch (e) { onError(mensajeError(e, 'No se pudo crear el usuario.')) }
     finally { setBusy(false) }
@@ -465,7 +476,12 @@ function CompanyUsers({ companyId, onError }: { companyId: string; onError: (mes
     </form>
     {resetUser && <ClaveDialog titulo={`Nueva contraseña para ${resetUser.name || resetUser.email}`} alCerrar={() => setResetUser(null)} alGuardar={async (nextPassword) => {
       await platformAction({ action: 'reset-password', userId: resetUser.user_id, password: nextPassword })
-      void mostrarDatos({ titulo: 'Contraseña cambiada', mensaje: 'Pasale los datos nuevos por un canal privado.', datos: `Correo: ${resetUser.email}\nContraseña: ${nextPassword}`, advertencia: 'La contraseña no se vuelve a mostrar.' })
+      void mostrarDatos({
+        titulo: `Contraseña de ${resetUser.name || resetUser.email} cambiada`,
+        mensaje: 'Copiá este mensaje y mandáselo.',
+        datos: mensajeClaveNueva({ nombre: resetUser.name ?? undefined, email: resetUser.email, clave: nextPassword }),
+        advertencia: advertenciaAcceso(),
+      })
       setResetUser(null)
     }} />}
   </>
