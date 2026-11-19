@@ -1,3 +1,4 @@
+import { Iniciales } from '../components/Iniciales'
 import { CargandoFilas } from '../components/EstadoVacio'
 import { useAvisos } from '../components/Avisos'
 import { useEffect, useState, type FormEvent } from 'react'
@@ -108,7 +109,7 @@ export function Equipo() {
 
   const eliminar = async (u: UsuarioEquipo) => {
     if (!await confirmar({ titulo: `¿Eliminar a ${u.name || u.email}?`, mensaje: 'Ya no va a poder ingresar. Los presupuestos que hizo se mantienen.', confirmar: 'Eliminar', peligro: true })) return
-    try { await repositorio.usuarios.eliminar(u.id); avisar('Integrante eliminado.'); await cargar() }
+    try { await repositorio.usuarios.eliminar(u.id); avisar(`${u.name || u.email} ya no forma parte del equipo.`); await cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar al empleado.')) }
   }
 
@@ -226,7 +227,7 @@ export function Equipo() {
               {lista === null && <CargandoFilas columnas={5} filas={3} />}
               {lista?.map((u) => (
                 <tr key={u.id}>
-                  <td className="equipo-persona" data-label="Persona"><strong>{u.name || '—'}</strong>{u.id === usuario?.id && <small>Vos</small>}</td>
+                  <td className="equipo-persona" data-label="Persona"><span className="persona"><Iniciales nombre={u.name || u.email} clave={u.email} /><span><strong>{u.name || '—'}</strong>{u.id === usuario?.id && <small>Vos</small>}</span></span></td>
                   <td className="equipo-correo" data-label="Correo">{u.email}</td>
                   <td className="equipo-rol" data-label="Rol">
                     {u.rol === 'admin' ? <span className="pill pers">Administrador</span> : (

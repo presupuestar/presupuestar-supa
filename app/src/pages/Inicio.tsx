@@ -9,16 +9,31 @@ import { importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
 import { presupuestoCaducado } from '../lib/estados'
 import { repositorio } from '../lib/repositorio'
-import type { ResumenMes } from '../lib/tipos'
+import type { Presupuesto, ResumenMes } from '../lib/tipos'
+import { ETIQUETA, sePuedeEditar } from '../lib/estados'
+import { Importe } from '../components/Importe'
+import { Iniciales } from '../components/Iniciales'
+import { haceCuanto } from '../lib/tiempo'
 
 const nombreMes = (aaaamm: string) =>
   new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+
+/** Saludo según la hora del día, como lo diría una persona. */
+const saludo = (hora: number) => hora >= 5 && hora < 13 ? 'Buen día' : hora >= 13 && hora < 20 ? 'Buenas tardes' : 'Buenas noches'
+
+const nombreVisible = (nombre?: string) => {
+  const limpio = (nombre ?? '').trim()
+  if (!limpio || limpio.includes('@')) return ''
+  return limpio.split(/\s+/)[0]
+}
 
 export function Inicio() {
   const { empresa, usuario } = useSesion()
   const [meses, setMeses] = useState<ResumenMes[]>([])
   const [caducados, setCaducados] = useState(0)
   const [borradores, setBorradores] = useState(0)
+  const [esperando, setEsperando] = useState(0)
+  const [ultimos, setUltimos] = useState<Presupuesto[]>([])
   const [cargado, setCargado] = useState(false)
   const [error, setError] = useState('')
   const puedeVer = tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')
@@ -30,6 +45,8 @@ export function Inicio() {
           setMeses(repositorio.resumenMensual(l))
           setCaducados(l.filter((p) => presupuestoCaducado(p, empresa?.validezDias)).length)
           setBorradores(l.filter((p) => p.estado === 'borrador').length)
+          setUltimos([...l].sort((a, b) => (b.updated || b.created).localeCompare(a.updated || a.created)).slice(0, 5))
+          setEsperando(l.filter((p) => p.estado === 'pendiente' && !presupuestoCaducado(p, empresa?.validezDias)).length)
           setCargado(true)
         })
         .catch((e) => setError(mensajeError(e, 'No se pudo cargar el resumen de presupuestos.')))
@@ -37,6 +54,12 @@ export function Inicio() {
   }, [usuario, empresa?.validezDias])
 
   const mes = meses[0]
+  const ahora = new Date()
+  const fechaHoy = ahora.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const nombre = nombreVisible(usuario?.name)
+  const subtitulo = cargado && esperando > 0
+    ? (esperando === 1 ? 'Tenés 1 presupuesto esperando respuesta del cliente.' : `Tenés ${esperando} presupuestos esperando respuesta de los clientes.`)
+    : tienePermiso(usuario, 'quotes.view_all') ? `Así vienen los presupuestos de ${empresa?.nombre ?? 'la empresa'}.` : 'Así vienen tus presupuestos.'
   const resumenMes = mes ? meses.filter((m) => m.mes === mes.mes) : []
   const monedas = [...new Set(meses.map((m) => normalizarMoneda(m.moneda)))]
   const tendencias = monedas.map((moneda) => ({
@@ -60,8 +83,9 @@ export function Inicio() {
         {error && <p className="error" role="alert">{error}</p>}
         <div className="encabezado">
           <div>
-            <h1>Hola{empresa ? `, ${empresa.nombre}` : ''}</h1>
-            <p className="sub">{tienePermiso(usuario, 'quotes.view_all') ? 'Presupuestos de la empresa.' : 'Tus presupuestos.'}</p>
+            <p className="antetitulo">{fechaHoy}</p>
+            <h1>{saludo(ahora.getHours())}{nombre ? `, ${nombre}` : ''}</h1>
+            <p className="sub">{subtitulo}</p>
           </div>
           {tienePermiso(usuario, 'quotes.create') && <Link className="btn chico" to="/nuevo">Nuevo presupuesto</Link>}
         </div>
@@ -121,6 +145,32 @@ export function Inicio() {
             <div className="graficos-barras">
               {tendencias.map((tendencia) => <GraficoBarras key={tendencia.moneda} titulo={`Evolución mensual · ${tendencia.moneda}`} datos={tendencia.datos} />)}
             </div>
+          </section>
+        )}
+
+        {cargado && ultimos.length > 0 && (
+          <section className="ultimos">
+            <div className="encabezado"><h2>Lo último</h2><Link className="link" to="/historial">Ver todos</Link></div>
+            <ul className="ultimos-lista">
+              {ultimos.map((p) => {
+                const cliente = p.clienteDatos?.nombre || 'Sin cliente'
+                const destino = sePuedeEditar(p.estado) ? `/presupuestos/${p.id}/editar` : '/historial'
+                const caducado = presupuestoCaducado(p, empresa?.validezDias)
+                return (
+                  <li key={p.id}>
+                    <Link to={destino} className="ultimos-fila">
+                      <Iniciales nombre={cliente} />
+                      <span className="ultimos-cliente">
+                        <strong>{cliente}</strong>
+                        <small>N° {String(p.numero).padStart(4, '0')} · {p.estado === 'borrador' ? 'editado' : 'emitido'} {haceCuanto(p.estado === 'borrador' ? (p.updated || p.created) : (p.fechaEmision || p.created))}{tienePermiso(usuario, 'quotes.view_all') && p.vendedorNombre ? ` · ${p.vendedorNombre}` : ''}</small>
+                      </span>
+                      <span className="ultimos-total"><Importe valor={p.total} moneda={p.moneda} /></span>
+                      <span className={`estado-punto ${caducado ? 'caducado' : p.estado}`}>{caducado ? 'Caducado' : ETIQUETA[p.estado]}</span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
           </section>
         )}
       </main>

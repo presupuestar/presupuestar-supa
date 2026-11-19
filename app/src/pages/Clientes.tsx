@@ -131,7 +131,7 @@ export function Clientes() {
     try {
       await repositorio.clientes.eliminar(client.id)
       if (selected?.id === client.id) setSelected(null)
-      avisar('Cliente eliminado.')
+      avisar('Cliente eliminado. Sus presupuestos siguen en el historial.')
       await loadClients()
     } catch (e) { setError(mensajeError(e, 'No se pudo eliminar el cliente.')) }
   }
@@ -178,7 +178,7 @@ export function Clientes() {
       </>}
       {editing && <ClientForm client={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={async () => {
         setEditing(null)
-        avisar('Cliente guardado.')
+        avisar('Listo, cliente guardado.')
         const fresh = await repositorio.clientes.listar()
         setClients(fresh)
         setSelected(fresh.find((c) => c.id === selected.id) ?? selected)
@@ -222,7 +222,7 @@ export function Clientes() {
     )}
     {editing && <ClientForm client={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={async () => {
       setEditing(null)
-      avisar('Cliente guardado.')
+      avisar('Listo, cliente guardado.')
       const fresh = await repositorio.clientes.listar()
       setClients(fresh)
     }} />}

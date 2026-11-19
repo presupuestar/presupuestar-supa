@@ -29,6 +29,17 @@ export function Login() {
         <span className="marca"><Isotipo size={44} tile="#1F6FEB" /><strong>Presupuest<b style={{ color: '#5BB5F0' }}>AR</b></strong></span>
         <h1>Presupuestos profesionales en 1 minuto.</h1>
         <p>Cargá tus servicios una vez y armá cada presupuesto con los datos de tu cliente.</p>
+        <div className="login-ilustracion" aria-hidden="true">
+          <div className="hoja hoja-atras" />
+          <div className="hoja">
+            <div className="hoja-cabeza"><span className="hoja-logo" /><span><i className="l70" /><i className="l45" /></span><small>N.º 0128</small></div>
+            <div className="hoja-fila"><i className="l60" /><b>$ 185.000,00</b></div>
+            <div className="hoja-fila"><i className="l45" /><b>$ 62.500,00</b></div>
+            <div className="hoja-fila"><i className="l55" /><b>$ 40.000,00</b></div>
+            <div className="hoja-total"><span>Total</span><strong>$ 287.500,00</strong></div>
+            <span className="hoja-sello">Aceptado</span>
+          </div>
+        </div>
       </section>
       <section className="login-form">
         <form onSubmit={enviar}>

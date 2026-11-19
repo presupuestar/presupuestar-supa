@@ -2,6 +2,16 @@ import { repositorio } from './repositorio'
 import type { Empresa } from './tipos'
 
 const ESTILO_FUENTES = 'tema-fuentes'
+const ICONO_PRESUPUESTAR = '/favicon.svg'
+
+/** Ícono de la pestaña del navegador: el logo de la empresa o, si no tiene, el de PresupuestAR. */
+function ponerIcono(url?: string) {
+  let icono = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+  if (!icono) { icono = document.createElement('link'); icono.rel = 'icon'; document.head.appendChild(icono) }
+  icono.href = url || ICONO_PRESUPUESTAR
+  if (url) icono.removeAttribute('type')
+  else icono.type = 'image/svg+xml'
+}
 
 /** Aplica colores y tipografías de la empresa (su brandbook) a toda la app. */
 export function aplicarTema(e: Empresa) {
@@ -34,6 +44,7 @@ export function aplicarTema(e: Empresa) {
   raiz.setProperty('--fuente-titulos', `"${titulos}", system-ui, sans-serif`)
   raiz.setProperty('--fuente-texto', `"${texto}", system-ui, sans-serif`)
   document.title = e.nombre
+  ponerIcono(repositorio.empresa.archivoUrl(e, e.logo))
 }
 
 /** Quita la marca de la empresa (al cerrar sesión o antes de ingresar). */
@@ -43,4 +54,5 @@ export function restablecerTema() {
   const estilo = document.getElementById(ESTILO_FUENTES)
   if (estilo) estilo.textContent = ''
   document.title = 'PresupuestAR'
+  ponerIcono()
 }

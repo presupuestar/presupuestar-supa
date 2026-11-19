@@ -105,7 +105,7 @@ export function Catalogo() {
   const cantidadSeleccionada = seleccionados.size
 
   const alternar = async (i: Item) => {
-    try { await repositorio.items.actualizar(i.id, { activo: !i.activo }); avisar(i.activo ? 'Ítem desactivado.' : 'Ítem activado.'); cargar() }
+    try { await repositorio.items.actualizar(i.id, { activo: !i.activo }); avisar(i.activo ? 'Ítem desactivado: ya no aparece al armar presupuestos.' : 'Ítem activado: ya se puede usar en presupuestos.'); cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo cambiar el estado del ítem.')) }
   }
   const eliminar = async (i: Item) => {
@@ -585,7 +585,7 @@ export function Catalogo() {
         <FormItem
           item={editando === 'nuevo' ? null : editando}
           alCerrar={() => setEditando(null)}
-          alGuardar={() => { setEditando(null); avisar('Ítem guardado.'); cargar() }}
+          alGuardar={() => { setEditando(null); avisar('Listo, el ítem quedó en el catálogo.'); cargar() }}
         />
       )}
     </Layout>

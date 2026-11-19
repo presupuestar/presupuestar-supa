@@ -12,8 +12,30 @@ import { mensajeError } from '../lib/errores'
 import { ETIQUETA, fechaVigencia, opcionesEstado, presupuestoCaducado, sePuedeEditar } from '../lib/estados'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
 import type { Estado, Presupuesto } from '../lib/tipos'
+import { Iniciales, colorPersona } from '../components/Iniciales'
+import { Importe } from '../components/Importe'
+import { cuandoVence, haceCuanto } from '../lib/tiempo'
 
 const mesDe = (p: Presupuesto) => (p.fechaEmision || p.created).slice(0, 7)
+/** Cómo viene cada presupuesto, en palabras: «enviado hace 3 días · vence en 4 días». */
+function situacion(p: Presupuesto, validezEmpresa: number | undefined, hoy: Date): string {
+  if (p.estado === 'borrador') return p.updated ? `Editado ${haceCuanto(p.updated, hoy)}` : ''
+  if (p.estado === 'pendiente') {
+    const vence = cuandoVence(fechaVigencia(p.fechaEmision, p.validezDias ?? validezEmpresa, p.vigenteHasta), hoy)
+    return [`Enviado ${haceCuanto(p.fechaEmision || p.created, hoy)}`, vence].filter(Boolean).join(' · ')
+  }
+  const cuando = p.fechaRespuesta ? haceCuanto(p.fechaRespuesta, hoy) : ''
+  if (!cuando) return ''
+  return `${p.estado === 'aceptado' ? 'Aceptado' : 'Rechazado'} ${cuando}`
+}
+
+const AVISO_ESTADO: Record<Estado, string> = {
+  borrador: 'Volvió a borrador.',
+  pendiente: 'Listo, quedó pendiente de respuesta.',
+  aceptado: '¡Aceptado! Buena venta.',
+  rechazado: 'Marcado como rechazado.',
+}
+
 const nombreMes = (aaaamm: string) => {
   const t = new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
   return t.charAt(0).toUpperCase() + t.slice(1)
@@ -115,12 +137,12 @@ export function Historial() {
     moneda,
     datos: ranking
       .filter((fila) => normalizarMoneda(fila.moneda) === moneda && fila.vendido > 0)
-      .map((fila, index) => ({
+      .map((fila) => ({
         clave: fila.clave,
         etiqueta: fila.nombre,
         valor: fila.vendido,
         valorTexto: importeEnMoneda(fila.vendido, fila.moneda),
-        color: `vendedor-${(index % 8) + 1}` as ColorSegmento,
+        color: `vendedor-${colorPersona(fila.clave || fila.nombre)}` as ColorSegmento,
       })),
   })), [ranking])
   const vendedores = useMemo(() => {
@@ -154,7 +176,7 @@ export function Historial() {
 
   const cambiarEstado = async (p: Presupuesto, nuevo: Estado) => {
     setError('')
-    try { await repositorio.presupuestos.cambiarEstado(p.id, nuevo); await cargar() }
+    try { await repositorio.presupuestos.cambiarEstado(p.id, nuevo); avisar(AVISO_ESTADO[nuevo]); await cargar() }
     catch (e) {
       const base = mensajeError(e, 'No se pudo cambiar el estado.')
       setError(p.estado === 'borrador' ? `${base} Abrí el borrador con "Editar" para completar los datos y emitirlo.` : base)
@@ -165,7 +187,7 @@ export function Historial() {
   const eliminar = async (p: Presupuesto) => {
     const ok = await confirmar({ titulo: `¿Eliminar el presupuesto N° ${String(p.numero).padStart(4, '0')}?`, mensaje: 'Esta acción no se puede deshacer.', confirmar: 'Eliminar presupuesto', peligro: true })
     if (!ok) return
-    try { await repositorio.presupuestos.eliminar(p.id); avisar('Presupuesto eliminado.'); await cargar() }
+    try { await repositorio.presupuestos.eliminar(p.id); avisar(`Presupuesto N° ${String(p.numero).padStart(4, '0')} eliminado.`); await cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar el presupuesto.')) }
   }
 
@@ -290,8 +312,10 @@ export function Historial() {
                   </td>
                   <td className="campo-numero" data-label="N°"><strong>{String(p.numero).padStart(4, '0')}</strong></td>
                   <td className="campo-fecha" data-label="Fecha">{fechaCorta(p.fechaEmision || p.created)}</td>
-                  <td className="campo-vendedor" data-label="Vendedor">{p.vendedorNombre || <span className="sin-dato">Sin asignar</span>}</td>
-                  <td className="campo-total num" data-label="Total">{importeEnMoneda(p.total, p.moneda)}</td>
+                  <td className="campo-vendedor" data-label="Vendedor">{p.vendedorNombre || p.vendedorEmail
+                    ? <span className="persona"><Iniciales nombre={p.vendedorNombre || p.vendedorEmail || ''} clave={p.vendedorEmail || p.vendedorNombre} chico />{p.vendedorNombre || p.vendedorEmail}</span>
+                    : <span className="sin-dato">Sin asignar</span>}</td>
+                  <td className="campo-total num" data-label="Total"><Importe valor={p.total} moneda={p.moneda} /></td>
                   <td className="campo-estado" data-label="Estado">
                     {presupuestoCaducado(p, empresa?.validezDias, ahora)
                       ? <><span className="pill caducado" aria-label={`Presupuesto ${p.numero} caducado`}>Caducado · venció el {fechaCorta(fechaVigencia(p.fechaEmision, p.validezDias ?? empresa?.validezDias, p.vigenteHasta))}</span><select className={`estado-sel ${p.estado}`} value={p.estado} aria-label={`Cambiar estado del presupuesto ${p.numero}`}
@@ -302,6 +326,7 @@ export function Historial() {
                       onChange={(e) => cambiarEstado(p, e.target.value as Estado)}>
                       {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
                     </select>}
+                    {!presupuestoCaducado(p, empresa?.validezDias, ahora) && situacion(p, empresa?.validezDias, ahora) && <small className="situacion">{situacion(p, empresa?.validezDias, ahora)}</small>}
                   </td>
                   <td className="campo-acciones">
                     <div className="acciones-historial">
@@ -314,7 +339,7 @@ export function Historial() {
               ))}
             </tbody>
             {visibles.length > 0 && (
-              <tfoot><tr><td colSpan={4}>{visibles.length} presupuesto{visibles.length === 1 ? '' : 's'}</td><td className="num">{totalVisible.map(([moneda, total]) => <div key={moneda}>{importeEnMoneda(total, moneda)}</div>)}</td><td colSpan={2} /></tr></tfoot>
+              <tfoot><tr><td colSpan={4}>{visibles.length} presupuesto{visibles.length === 1 ? '' : 's'}</td><td className="num">{totalVisible.map(([moneda, total]) => <div key={moneda}><Importe valor={total} moneda={moneda} /></div>)}</td><td colSpan={2} /></tr></tfoot>
             )}
           </table>
         </div>
