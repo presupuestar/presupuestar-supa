@@ -1243,7 +1243,7 @@ body{background:
 /* Material base */
 .panel,.tabla-caja,.grafico-circular,.grafico-barras,.ultimos-lista,.inicio-vacio,.listo,
 .barra-seleccion-catalogo,.seccion-proveedor>.catalogo-desplegable-resumen,.tarjetas article,
-.lista-roles>li,.selector-archivo-caja,.seccion-desplegable,.resultados-agregar-item,.catalogo-menu-fila>div{
+.lista-roles>li,.selector-archivo-caja,.resultados-agregar-item,.catalogo-menu-fila>div{
   background:var(--vidrio);
   border:1px solid var(--vidrio-borde);
   box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),var(--vidrio-sombra);
@@ -1314,3 +1314,87 @@ dialog::backdrop{background:rgba(16,24,40,.28);-webkit-backdrop-filter:blur(6px)
 @media (prefers-reduced-transparency:reduce){
   :root{--vidrio:var(--superficie);--vidrio-fuerte:var(--superficie)}
 }
+
+/* ───────── Ajustes del vidrio: rellenos, esquinas y botones ─────────
+   Rellenos internos translúcidos (un «hueco» en el vidrio) en lugar de bloques opacos,
+   y radios acordes al tamaño de cada cosa para que el texto no quede pegado a las esquinas. */
+:root{--hueco:rgba(16,24,40,.045);--hueco-fuerte:rgba(16,24,40,.07);--hueco-borde:rgba(16,24,40,.08)}
+:root[data-tema=oscuro]{--hueco:rgba(255,255,255,.045);--hueco-fuerte:rgba(255,255,255,.075);--hueco-borde:rgba(255,255,255,.09)}
+@media (prefers-color-scheme:dark){:root:not([data-tema=claro]){--hueco:rgba(255,255,255,.045);--hueco-fuerte:rgba(255,255,255,.075);--hueco-borde:rgba(255,255,255,.09)}}
+
+.tabla tfoot td,.vacio-linea,.eleccion-moneda-item,.revision-importacion,.importador-progreso,.grafico-barras-riel,
+.terminos-scroll,.ventana-datos .datos-acceso,:root .datos-acceso,.campo input:disabled{background:var(--hueco)}
+.eleccion-moneda-item,.revision-importacion,.importador-progreso,.terminos-scroll,.ventana-datos .datos-acceso{border-color:var(--hueco-borde)}
+.resumen-tabla tbody tr:hover td,.resultados-agregar-item button:hover,.resultados-agregar-item button:focus-visible,
+.permisos-rol label:hover,.barra nav a:hover,.salir:hover,.ojo-password:hover{background:var(--hueco-fuerte)}
+.resultados-agregar-item button{background:transparent}
+.linea .sub-total{background:var(--hueco)}
+
+/* Botones: rectángulos bien redondeados (no óvalos) con aire a los lados */
+.btn{border-radius:14px}
+.btn.chico{border-radius:12px;padding:10px 18px}
+.barra-seleccion-catalogo .btn.chico,.paginacion-catalogo .btn.chico{border-radius:10px;padding:7px 12px}
+.selector-archivo-caja .btn.chico{border-radius:9px}
+.btn:disabled{opacity:.5}
+.btn.sec:disabled{background:transparent;box-shadow:none}
+
+/* Desplegables de origen del catálogo: mismo radio que las tarjetas */
+.seccion-proveedor>.catalogo-desplegable-resumen{border-radius:18px;padding:12px 16px}
+.seccion-proveedor[open]>.catalogo-desplegable-resumen{border-radius:18px 18px 0 0}
+.seccion-proveedor[open]>.tabla-caja{border-radius:0 0 18px 18px}
+.etiqueta-mayorista,.pill{padding-left:10px;padding-right:10px}
+
+/* Selector de archivo: el nombre no toca el borde derecho */
+.selector-archivo-caja{padding-right:14px;border-radius:14px}
+
+/* Selector de rol dentro de la tarjeta de cada persona */
+.tabla-equipo select{font:500 13px var(--fuente-texto);padding:6px 28px 6px 10px;border:1px solid var(--hueco-borde);border-radius:10px;background-color:var(--hueco);color:var(--tinta);max-width:100%}
+
+@media (max-width:820px){
+  /* Historial en tarjetas: la franja de acciones y el total siguen las esquinas de la tarjeta */
+  .tabla-historial tbody tr{overflow:hidden}
+  .tabla-historial .campo-acciones{background:var(--hueco);border-top:1px solid var(--hueco-borde);padding:9px 12px}
+  .tabla-historial .campo-total{background:color-mix(in srgb,var(--acento) 12%,transparent);border-radius:12px;margin:6px 8px 6px 0;padding:9px 10px}
+  .tabla-historial tbody td:first-child{padding-left:14px}
+  .tabla-historial .campo-cliente,.tabla-historial .campo-numero,.tabla-historial .campo-vendedor{padding-left:14px}
+  /* El nombre del vendedor se corta entre palabras, no en medio de una */
+  .tabla-historial .campo-vendedor{overflow-wrap:normal}
+  .tabla-historial .campo-vendedor .persona{flex-direction:column;align-items:flex-start;gap:4px}
+  .tabla-historial tfoot td{background:transparent}
+  .tabla-historial tfoot tr{padding:12px 6px}
+  /* Filas-tarjeta: aire suficiente para el radio */
+  .tabla-clientes tbody tr:not(.fila-vacia),.tabla-catalogo tbody tr:not(.fila-vacia),.tabla-equipo tbody tr:not(.fila-vacia){padding:14px 16px}
+  .seccion-proveedor>.catalogo-desplegable-resumen{padding:10px 12px 10px 14px}
+  .linea{border-radius:16px;border-color:var(--hueco-borde);background:var(--hueco)}
+}
+@media (max-width:820px){
+  /* Catálogo en celular: las filas son tarjetas sueltas, así que el encabezado del origen va completo */
+  .seccion-proveedor[open]>.catalogo-desplegable-resumen{border-radius:18px;margin-bottom:10px}
+  .barra-seleccion-catalogo .peligro-catalogo{grid-column:1/-1}
+}
+
+/* Menú superior: cada opción en una línea; en pantallas medianas se esconde el correo para que entre todo */
+.barra nav a{white-space:nowrap}
+@media (max-width:1180px) and (min-width:821px){
+  .barra{gap:16px;padding-left:18px;padding-right:18px}
+  .barra .usuario-correo{display:none}
+  .barra nav a{padding:7px 10px}
+}
+/* Historial en escritorio: la situación puede ocupar dos líneas y las acciones se acomodan, así la tabla no desborda */
+@media (min-width:821px){
+  .tabla-historial .situacion{white-space:normal;max-width:190px}
+  .tabla-historial .acciones-historial{flex-wrap:wrap;gap:6px}
+  .tabla-historial .campo-vendedor .persona{white-space:nowrap}
+}
+@media (max-width:1180px) and (min-width:821px){
+  .tabla-historial th,.tabla-historial td{padding-left:12px;padding-right:12px}
+}
+@media (min-width:821px){
+  .tabla-equipo .equipo-acciones{flex-wrap:wrap;row-gap:6px}
+  .tabla-equipo select{max-width:180px}
+}
+/* Si una tabla igual necesita desplazarse de costado, la barra queda dentro de las esquinas redondeadas */
+.tabla-caja{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 45%,transparent) transparent}
+.tabla-caja::-webkit-scrollbar{height:8px}
+.tabla-caja::-webkit-scrollbar-track{margin:0 18px;background:transparent}
+.tabla-caja::-webkit-scrollbar-thumb{border-radius:999px;background:color-mix(in srgb,var(--muted) 45%,transparent)}
