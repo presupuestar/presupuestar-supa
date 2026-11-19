@@ -1190,3 +1190,6 @@ input,textarea{caret-color:var(--acento)}
   .ultimos-cliente small{white-space:normal;line-height:1.4}
 }
 @media (prefers-reduced-motion:reduce){.ultimos-lista li{animation:none}}
+
+/* Marca al final de la revisión del PDF: deja lugar para el pie fijo con «Aprobar» */
+.importacion-fin{height:1px;margin-top:-1px;scroll-margin-bottom:150px}

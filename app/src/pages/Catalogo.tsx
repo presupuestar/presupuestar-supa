@@ -40,6 +40,13 @@ export function Catalogo() {
   const { confirmar, avisar } = useAvisos()
   const pdfInput = useRef<HTMLInputElement>(null)
   const revisionFinal = useRef<HTMLDivElement>(null)
+  const botonAprobar = useRef<HTMLButtonElement>(null)
+  /** Lleva al final de la lista (el pie con «Aprobar» está fijo abajo y siempre se ve, así que se usa una marca al final). */
+  const irAlFinal = () => {
+    const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    revisionFinal.current?.scrollIntoView({ behavior: reducido ? 'auto' : 'smooth', block: 'end' })
+    botonAprobar.current?.focus({ preventScroll: true })
+  }
   const confirmacionRef = useRef<HTMLDialogElement>(null)
   const [items, setItems] = useState<Item[] | null>(null)
   const importadorPdf = useRef<HTMLDetailsElement>(null)
@@ -526,7 +533,7 @@ export function Catalogo() {
                     <p className="ayuda">Se detectaron {candidatos.length} ítems con precio válido. Los que comparten nombre pero tienen distinto precio o moneda se agregan por separado automáticamente. Si el PDF no indica una moneda, se toma como ARS; las filas sin precio se descartan.</p>
                     {candidatos.some((c) => c.error) && <p className="error" role="alert">{candidatos.filter((c) => c.error).length} ítems requieren revisión. Están desmarcados: revisá el motivo y corregí los datos si hace falta. Podés seleccionar todos juntos para reintentarlos o marcar solo algunos.</p>}
                   </div>
-                  <button type="button" className="btn sec chico" onClick={() => revisionFinal.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}>Ir al final para aprobar ↓</button>
+                  <button type="button" className="btn sec chico" onClick={irAlFinal}>Ir al final para aprobar ↓</button>
                 </div>
                 {candidatos.some((c) => !c.seleccionado) && <div className="botones importador-acciones">
                   <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={() => setCandidatos((actuales) => actuales.map((c) => ({ ...c, seleccionado: true })))}>
@@ -556,7 +563,8 @@ export function Catalogo() {
                   <span>Ítems {paginaCandidatos * ITEMS_POR_PAGINA + 1}–{Math.min((paginaCandidatos + 1) * ITEMS_POR_PAGINA, candidatos.length)} de {candidatos.length}</span>
                   <button type="button" className="btn sec chico" disabled={paginaCandidatos >= Math.ceil(candidatos.length / ITEMS_POR_PAGINA) - 1} onClick={() => setPaginaCandidatos((pagina) => pagina + 1)}>Siguiente</button>
                 </div>}
-                <div className="importacion-pie" ref={revisionFinal}>
+                <div className="importacion-fin" ref={revisionFinal} aria-hidden="true" />
+                <div className="importacion-pie">
                   {mensajeImportacion && <p className="ok-msg" role="status">{mensajeImportacion}</p>}
                   {guardandoPdf && <div className="importador-progreso" role="status" aria-live="polite">
                     <span className="indicador-carga" aria-hidden="true" />
@@ -564,7 +572,7 @@ export function Catalogo() {
                   </div>}
                   <div className="botones importador-acciones revision-acciones">
                     <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={rechazarLectura}>Cancelar revisión</button>
-                    <button type="button" className="btn chico" disabled={guardandoPdf || leyendoPdf || candidatos.every((c) => !c.seleccionado)} onClick={guardarImportacion}>
+                    <button ref={botonAprobar} type="button" className="btn chico" disabled={guardandoPdf || leyendoPdf || candidatos.every((c) => !c.seleccionado)} onClick={guardarImportacion}>
                       {guardandoPdf ? 'Sincronizando…' : candidatos.some((c) => c.seleccionado && c.error)
                         ? `Reintentar y sincronizar ${candidatos.filter((c) => c.seleccionado).length} ítems`
                         : `Aprobar y sincronizar ${candidatos.filter((c) => c.seleccionado).length} ítems`}
