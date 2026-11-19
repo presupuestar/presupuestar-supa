@@ -34,6 +34,8 @@ interface CandidatoImportacion {
   moneda: string
   seleccionado: boolean
   error?: string
+  /** Motivo por el que podría no ser un producto (llega desmarcado). */
+  dudoso?: string
 }
 
 export function Catalogo() {
@@ -204,7 +206,7 @@ export function Catalogo() {
     setLeyendoPdf(true)
     try {
       const { leerMaterialesPdf } = await import('../lib/importarCatalogoPdf')
-      const materiales = await leerMaterialesPdf(archivoPdf, ({ pagina, paginas }) => {
+      const { materiales, ignorados } = await leerMaterialesPdf(archivoPdf, ({ pagina, paginas }) => {
         setProgresoLectura(paginas === 0 ? 'Abriendo PDF…' : `Leyendo página ${pagina} de ${paginas}…`)
       })
       const materialesConPrecio = materiales.filter((material) =>
@@ -219,8 +221,13 @@ export function Catalogo() {
           if (!filasUnicas.has(clave)) filasUnicas.set(clave, material)
         }
         const repetidos = materialesConPrecio.length - filasUnicas.size
-        setCandidatos([...filasUnicas.values()].map((m) => ({ key: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`, nombre: m.nombre, precio: formatearImporte(m.precio), moneda: normalizarMoneda(m.moneda), seleccionado: true })))
+        const unicos = [...filasUnicas.values()]
+        setCandidatos(unicos.map((m) => ({ key: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`, nombre: m.nombre, precio: formatearImporte(m.precio), moneda: normalizarMoneda(m.moneda), seleccionado: !m.dudoso, dudoso: m.dudoso })))
+        const totalIgnorados = ignorados.reduce((suma, i) => suma + i.cantidad, 0)
+        const dudosos = unicos.filter((m) => m.dudoso).length
         const avisos = [
+          totalIgnorados > 0 ? `Se ignoraron ${totalIgnorados} fila${totalIgnorados === 1 ? '' : 's'} que no ${totalIgnorados === 1 ? 'parece un producto' : 'parecen productos'} (${ignorados.sort((a, b) => b.cantidad - a.cantidad).map((i) => `${i.motivo}: ${i.cantidad}`).join(' · ')}).` : '',
+          dudosos > 0 ? `${dudosos} fila${dudosos === 1 ? ' quedó' : 's quedaron'} sin marcar porque ${dudosos === 1 ? 'podría no ser un producto' : 'podrían no ser productos'}: ${dudosos === 1 ? 'revisala y marcala' : 'revisalas y marcalas'} si corresponde.` : '',
           repetidos > 0 ? `Se consolidaron ${repetidos} fila${repetidos === 1 ? '' : 's'} idéntica${repetidos === 1 ? '' : 's'}.` : '',
           descartados > 0 ? `Se descartaron ${descartados} fila${descartados === 1 ? '' : 's'} sin precio válido.` : '',
         ].filter(Boolean)
@@ -537,19 +544,23 @@ export function Catalogo() {
                 </div>
                 {candidatos.some((c) => !c.seleccionado) && <div className="botones importador-acciones">
                   <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={() => setCandidatos((actuales) => actuales.map((c) => ({ ...c, seleccionado: true })))}>
-                    Seleccionar todos para reintentar
+                    {candidatos.some((c) => c.error) ? 'Seleccionar todos para reintentar' : 'Marcar todos'}
                   </button>
+                  {candidatos.some((c) => c.dudoso) && <button type="button" className="btn sec chico" disabled={guardandoPdf || leyendoPdf} onClick={() => setCandidatos((actuales) => actuales.filter((c) => !c.dudoso || c.seleccionado))}>
+                    Quitar los dudosos sin marcar
+                  </button>}
                 </div>}
                 <div className="tabla-caja importacion-caja">
                   <table className="tabla tabla-importacion">
                     <thead><tr><th>Incluir</th><th>Ítem</th><th className="num">Precio unitario</th><th>Moneda</th></tr></thead>
                     <tbody key={paginaCandidatos}>
                       {candidatos.slice(paginaCandidatos * ITEMS_POR_PAGINA, (paginaCandidatos + 1) * ITEMS_POR_PAGINA).map((c) => (
-                        <tr key={c.key} className={`${c.seleccionado ? '' : 'apagado'}${c.error ? ' importacion-fallida' : ''}`}>
+                        <tr key={c.key} className={`${c.seleccionado ? '' : 'apagado'}${c.error ? ' importacion-fallida' : ''}${c.dudoso && !c.seleccionado ? ' importacion-dudosa' : ''}`}>
                           <td><input type="checkbox" checked={c.seleccionado} aria-label={`Incluir ${c.nombre}`} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, seleccionado: e.target.checked } : x))} /></td>
                           <td>
                             <input className="importacion-campo" aria-label="Nombre del ítem" value={c.nombre} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, nombre: e.target.value } : x))} />
                             {c.error && <small className="importacion-error" role="alert"><strong>No se pudo cargar:</strong> {c.error}</small>}
+                            {!c.error && c.dudoso && <small className="importacion-dudoso"><strong>¿Es un producto?</strong> {c.dudoso}</small>}
                           </td>
                           <td><input className="importacion-campo precio" aria-label={`Precio de ${c.nombre}`} inputMode="decimal" value={c.precio} onChange={(e) => setCandidatos((cs) => cs.map((x) => x.key === c.key ? { ...x, precio: e.target.value } : x))} /></td>
                           <td><span className="pill pers">{c.moneda}</span></td>

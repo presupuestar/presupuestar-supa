@@ -9,6 +9,16 @@ export interface MaterialPdf {
   cantidad: number | null
   precio: number
   moneda: string
+  /** Página del PDF donde apareció (sirve para detectar encabezados y pies que se repiten). */
+  pagina?: number
+  /** Si la fila podría no ser un producto, el motivo: llega desmarcada para que la persona decida. */
+  dudoso?: string
+}
+
+/** Resultado de leer el PDF: los ítems y cuántas filas se ignoraron por no parecer productos. */
+export interface LecturaPdf {
+  materiales: MaterialPdf[]
+  ignorados: { motivo: string; cantidad: number }[]
 }
 
 export interface ProgresoLecturaPdf {
@@ -239,7 +249,9 @@ function celdaEnColumna(fila: TextoPdf[], x: number | undefined, columnas: Colum
 }
 
 function limpiarNombre(texto: string, quitarImportes = true): string {
-  let nombre = (quitarImportes ? texto.replace(/(^|[^\d])\d+(?:\.\d{3})*,\d{1,2}(?=$|[^\d])/g, '$1 ') : texto)
+  // Solo se quitan importes de verdad (con miles o de 3 cifras o más); las medidas como
+  // «2,5 mm» o «1,50 m» son parte del nombre.
+  let nombre = (quitarImportes ? texto.replace(/(^|[^\d])(?:\d{1,3}(?:\.\d{3})+|\d{3,}),\d{1,2}(?!\d)(?!\s*(?:mm|cm|mts?|m|kg|grs?|g|w|kw|v|a|amp|lts?|l|ml|cc|hp|pulg|"|”)\b)/gi, '$1 ') : texto)
     .replace(/\s+/g, ' ')
     .trim()
   for (let i = 0; i < 4; i++) {
@@ -403,11 +415,82 @@ function leerMaterialesDeTarjetas(items: TextoPdf[]): MaterialPdf[] {
   return materiales
 }
 
+// ───────── ¿Es de verdad un producto? ─────────
+// La lectura toma cualquier línea o tarjeta que termine en un número con forma de precio.
+// En una lista real también aparecen datos de contacto, condiciones comerciales, encabezados
+// y totales: lo seguro se ignora y lo dudoso llega desmarcado con el motivo.
+
+const RUIDO_SEGURO: { motivo: string; patron: RegExp }[] = [
+  { motivo: 'datos de contacto', patron: /@|\bWWW\.|HTTPS?:|\.COM\b|\.COM\.AR\b|\b(?:TEL(?:EFONO|EFONOS)?|TELS?|CEL(?:ULAR)?|WHATS ?APP|WSP|FAX|E-?MAIL|CORREO|INSTAGRAM|FACEBOOK)\b/ },
+  { motivo: 'datos fiscales o de la empresa', patron: /\b(?:CUIT|CUIL|IIBB|INGRESOS BRUTOS|RESPONSABLE INSCRIPTO|MONOTRIBUT\w*|RAZON SOCIAL|DOMICILIO|HORARIOS? DE ATENCION|ATENCION AL CLIENTE|SUCURSAL(?:ES)?)\b/ },
+  { motivo: 'condiciones comerciales', patron: /\b(?:SUJETOS? A|SIN PREVIO AVISO|VIGENCIA|VIGENTES? (?:DESDE|HASTA|AL)|VALIDOS? (?:DESDE|HASTA|POR)|CONDICIONES|FORMAS? DE PAGO|ENVIOS?|FLETES?|BONIFICACION(?:ES)?|DESCUENTOS?|RECARGOS?|COMPRAS? (?:MAYORES|SUPERIORES|MINIMAS?|DESDE)|PEDIDOS? MINIMOS?|MONTO MINIMO|CONSULT(?:AR|E|ENOS)|NO INCLUYE|PRECIOS? (?:EXPRESADOS|SUJETOS|VALIDOS|VIGENTES)|COTIZACION|DOLAR (?:OFICIAL|BNA|BLUE|MEP)|TIPO DE CAMBIO|PAGO EN EFECTIVO|CUOTAS? SIN INTERES)\b/ },
+  { motivo: 'totales o resúmenes', patron: /^(?:TOTAL(?:ES)?|SUB ?TOTAL|IVA|NETO|SALDO|RESUMEN|IMPORTE TOTAL)\b/ },
+]
+
+
+function motivoRuido(m: MaterialPdf): string | undefined {
+  const n = normalizar(m.nombre)
+  for (const { motivo, patron } of RUIDO_SEGURO) if (patron.test(n)) return motivo
+  if (/:\s*$/.test(m.nombre.trim())) return 'títulos de sección'
+  // Teléfonos, CUIT o códigos largos leídos como si fueran el precio.
+  if (Number.isInteger(m.precio) && m.precio >= 100_000_000) return 'números que no son precios (teléfonos, CUIT o códigos)'
+  return undefined
+}
+
+const mediana = (valores: number[]) => {
+  const orden = [...valores].sort((a, b) => a - b)
+  const medio = Math.floor(orden.length / 2)
+  return orden.length % 2 ? orden[medio] : (orden[medio - 1] + orden[medio]) / 2
+}
+
+/** Separa lo que no es un producto y marca lo dudoso. */
+export function clasificarMateriales(materiales: MaterialPdf[], paginas = 1): LecturaPdf {
+  const ignorados = new Map<string, number>()
+  const ignorar = (motivo: string) => ignorados.set(motivo, (ignorados.get(motivo) ?? 0) + 1)
+
+  // Lo mismo, con el mismo precio, en 3 páginas o más es un encabezado o un pie de página.
+  const paginasPorFila = new Map<string, Set<number>>()
+  for (const m of materiales) {
+    const clave = `${normalizar(m.nombre)}|${m.precio}`
+    const conjunto = paginasPorFila.get(clave) ?? new Set<number>()
+    conjunto.add(m.pagina ?? 0)
+    paginasPorFila.set(clave, conjunto)
+  }
+
+  const quedan: MaterialPdf[] = []
+  for (const m of materiales) {
+    const motivo = motivoRuido(m)
+    if (motivo) { ignorar(motivo); continue }
+    // Encabezado o pie: misma fila en casi todas las páginas y sin pinta de producto
+    // (un producto de verdad rara vez se repite igual en cada hoja de la lista).
+    const repeticiones = paginasPorFila.get(`${normalizar(m.nombre)}|${m.precio}`)?.size ?? 0
+    if (paginas >= 3 && repeticiones >= 3 && repeticiones >= paginas * 0.8 && /\b(?:PAG(?:INA)?|LISTA|PRECIOS|DISTRIBUIDORA|MAYORISTA|S\.?A\.?|S\.?R\.?L\.?|HOJA|CONTINUA|SIGUE)\b/.test(normalizar(m.nombre))) { ignorar('encabezados o pies que se repiten en cada página'); continue }
+    if (/^(?:PAG(?:INA)?\.?\s*\d+|HOJA\s*\d+)\b/.test(normalizar(m.nombre))) { ignorar('números de página'); continue }
+    quedan.push(m)
+  }
+
+  // Dudosos: llegan desmarcados con el motivo.
+  const precios = quedan.map((m) => m.precio).filter((p) => p > 0)
+  const referencia = precios.length >= 8 ? mediana(precios) : 0
+  const resultado = quedan.map((m): MaterialPdf => {
+    const palabras = m.nombre.trim().split(/\s+/).length
+    let dudoso: string | undefined
+    if (m.precio === 0) dudoso = 'El precio es 0.'
+    else if (palabras > 16 || m.nombre.length > 130) dudoso = 'Parece una frase o una aclaración, no un producto.'
+    else if (referencia > 0 && (m.precio > referencia * 150 || m.precio < referencia / 150)) dudoso = 'El precio es muy distinto al del resto de la lista.'
+    else if (Number.isInteger(m.precio) && m.precio >= 1990 && m.precio <= 2040 && /\b(?:LISTA|PRECIOS?|CATALOGO|TEMPORADA|EDICION|ACTUALIZAD[AO])\b/.test(normalizar(m.nombre))) dudoso = 'El número parece un año, no un precio.'
+    else if (/^[A-ZÁÉÍÓÚÑ\s]+$/.test(m.nombre.trim()) && palabras <= 3 && m.nombre.trim() === m.nombre.trim().toUpperCase() && /\b(?:LINEA|SERIE|FAMILIA|CATEGORIA|RUBRO|SECCION|LISTA|CATALOGO)\b/.test(normalizar(m.nombre))) dudoso = 'Parece el título de una sección.'
+    return dudoso ? { ...m, dudoso } : m
+  })
+
+  return { materiales: resultado, ignorados: [...ignorados.entries()].map(([motivo, cantidad]) => ({ motivo, cantidad })) }
+}
+
 /** Lee texto seleccionable y detecta filas que terminan en un precio en formato argentino. */
 export async function leerMaterialesPdf(
   archivo: File,
   alProgresar?: (progreso: ProgresoLecturaPdf) => void,
-): Promise<MaterialPdf[]> {
+): Promise<LecturaPdf> {
   const tarea = pdfjs.getDocument({ data: new Uint8Array(await archivo.arrayBuffer()) })
   try {
     const documento = await tarea.promise
@@ -434,11 +517,14 @@ export async function leerMaterialesPdf(
         }
         return { items, filas: filasDePagina(contenido.items) }
       }))
-      for (const { items, filas } of resultados) {
+      for (const [indice, { items, filas }] of resultados.entries()) {
+        const numeroPagina = inicio + indice
+        const desde = materiales.length
         const tablasPagina = detectarTablas(filas)
         if (tablasPagina.length > 0) tablasDocumento = tablasPagina
         if (tablasDocumento.length > 0) {
           materiales.push(...leerMaterialesDeTabla(items, tablasPagina.length > 0 ? tablasPagina : tablasDocumento))
+          for (let i = desde; i < materiales.length; i++) materiales[i].pagina = numeroPagina
           continue
         }
         const columnasPagina: Columnas | null = detectarColumnas(filas) ?? columnas
@@ -452,10 +538,11 @@ export async function leerMaterialesPdf(
         // se usan si encuentran más productos que la lectura por filas.
         const porTarjetas = leerMaterialesDeTarjetas(items)
         materiales.push(...(porTarjetas.length > porFilas.length ? porTarjetas : porFilas))
+        for (let i = desde; i < materiales.length; i++) materiales[i].pagina = numeroPagina
       }
       alProgresar?.({ pagina: fin, paginas: documento.numPages })
     }
-    return materiales
+    return clasificarMateriales(materiales, documento.numPages)
   } finally {
     await tarea.destroy()
   }
