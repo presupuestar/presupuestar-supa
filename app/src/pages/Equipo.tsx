@@ -1,3 +1,5 @@
+import { CargandoFilas } from '../components/EstadoVacio'
+import { useAvisos } from '../components/Avisos'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Layout } from '../components/Layout'
 import { ClaveDialog } from '../components/ClaveDialog'
@@ -23,6 +25,7 @@ function mensajeErrorRoles(error: unknown): string {
 /** El administrador de la empresa crea y gestiona a sus empleados. */
 export function Equipo() {
   const { usuario, empresa } = useSesion()
+  const { confirmar, avisar } = useAvisos()
   const [lista, setLista] = useState<UsuarioEquipo[] | null>(null)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState<{ texto: string; copiar: string } | null>(null)
@@ -78,6 +81,7 @@ export function Equipo() {
       if (rolEnEdicion) await repositorio.roles.actualizar(rolEnEdicion, { nombre: nombreRol, permisos: permisosRol })
       else await repositorio.roles.crear({ nombre: nombreRol, permisos: permisosRol })
       setRolEnEdicion(null); setNombreRol(''); setPermisosRol([])
+      avisar('Rol guardado.')
       await cargarRoles()
     } catch (e) { setError(mensajeError(e, 'No se pudo guardar el rol.')) }
     finally { setRolCargando(false) }
@@ -87,8 +91,8 @@ export function Equipo() {
     if (lista?.some((integrante) => integrante.rol === rol.id)) {
       return setError('No se puede eliminar un rol asignado. Cambiá primero el rol de esas personas.')
     }
-    if (!confirm(`¿Eliminar el rol «${rol.nombre}»?`)) return
-    try { await repositorio.roles.eliminar(rol.id); await cargarRoles() }
+    if (!await confirmar({ titulo: `¿Eliminar el rol «${rol.nombre}»?`, confirmar: 'Eliminar rol', peligro: true })) return
+    try { await repositorio.roles.eliminar(rol.id); avisar('Rol eliminado.'); await cargarRoles() }
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar el rol.')) }
   }
 
@@ -96,14 +100,15 @@ export function Equipo() {
     setError(''); setRolGuardandoUsuario(integrante.id)
     try {
       await repositorio.usuarios.cambiarRol(integrante.id, role)
+      avisar('Rol actualizado.')
       await cargar()
     } catch (e) { setError(mensajeError(e, 'No se pudo cambiar el rol.')) }
     finally { setRolGuardandoUsuario(null) }
   }
 
   const eliminar = async (u: UsuarioEquipo) => {
-    if (!confirm(`¿Eliminar a ${u.name || u.email}?\n\nYa no va a poder ingresar. Los presupuestos que hizo se mantienen.`)) return
-    try { await repositorio.usuarios.eliminar(u.id); await cargar() }
+    if (!await confirmar({ titulo: `¿Eliminar a ${u.name || u.email}?`, mensaje: 'Ya no va a poder ingresar. Los presupuestos que hizo se mantienen.', confirmar: 'Eliminar', peligro: true })) return
+    try { await repositorio.usuarios.eliminar(u.id); avisar('Integrante eliminado.'); await cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar al empleado.')) }
   }
 
@@ -218,7 +223,7 @@ export function Equipo() {
           <table className="tabla tabla-equipo">
             <thead><tr><th>Persona</th><th>Correo</th><th>Rol</th><th>Alta</th><th><span className="sr">Acciones</span></th></tr></thead>
             <tbody>
-              {lista === null && <tr className="fila-vacia"><td colSpan={5} className="vacio">Cargando…</td></tr>}
+              {lista === null && <CargandoFilas columnas={5} filas={3} />}
               {lista?.map((u) => (
                 <tr key={u.id}>
                   <td className="equipo-persona" data-label="Persona"><strong>{u.name || '—'}</strong>{u.id === usuario?.id && <small>Vos</small>}</td>

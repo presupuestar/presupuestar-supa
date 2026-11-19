@@ -1,3 +1,4 @@
+import { BotonTema } from './BotonTema'
 import { useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { tienePermiso, useSesion } from '../context/Sesion'
@@ -29,10 +30,11 @@ export function Layout({ children }: { children: ReactNode }) {
           {usuario?.rol === 'admin' && <NavLink to="/equipo" className={clase}>Equipo</NavLink>}
           <span className="menu-usuario">
             <span className="menu-usuario-correo">{usuario?.email}</span>
+            <BotonTema />
             <button type="button" className="btn sec chico" onClick={salir}>Salir</button>
           </span>
         </nav>
-        <span className="usuario"><span className="usuario-correo" title={usuario?.email}>{usuario?.email}</span><button type="button" className="salir" onClick={salir}>Salir</button></span>
+        <span className="usuario"><BotonTema /><span className="usuario-correo" title={usuario?.email}>{usuario?.email}</span><button type="button" className="salir" onClick={salir}>Salir</button></span>
       </header>
       {children}
       {usuario?.terminosAceptados ? <PrimerAccesoDialog /> : <TerminosDialog />}

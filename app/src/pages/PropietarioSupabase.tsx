@@ -1,3 +1,4 @@
+import { useAvisos } from '../components/Avisos'
 import { cerrarConFondo } from '../lib/dialogo'
 import { SelectorArchivo } from '../components/SelectorArchivo'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
@@ -60,6 +61,7 @@ async function platformAction(body: Record<string, unknown>) {
 }
 
 export function PropietarioSupabase() {
+  const { mostrarDatos } = useAvisos()
   const [usuario, setUsuario] = useState<{ id: string; email: string; rol: string } | null>(null)
   const [cargando, setCargando] = useState(true)
   const { id } = useParams()
@@ -208,7 +210,7 @@ export function PropietarioSupabase() {
         company: { name: companyName.trim(), primary_color: '#0B2545', accent_color: '#5BB5F0', show_seal: true },
         admin: { name: adminName.trim(), email: adminEmail.trim(), password: adminPassword },
       })
-      alert(`Empresa creada.\n\nAdministrador: ${adminEmail.trim()}\nContraseña inicial: ${adminPassword}\n\nAnotá la contraseña: no se vuelve a mostrar.`)
+      void mostrarDatos({ titulo: 'Empresa creada', mensaje: 'Pasale estos datos al administrador de la empresa por un canal privado.', datos: `Administrador: ${adminEmail.trim()}\nContraseña inicial: ${adminPassword}`, advertencia: 'La contraseña no se vuelve a mostrar.' })
       setShowCreate(false)
       setCompanyName('')
       setAdminName('')
@@ -335,6 +337,7 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
   onError: (message: string) => void
   onDelete: () => void
 }) {
+  const { avisar } = useAvisos()
   const [form, setForm] = useState(company)
   const [logo, setLogo] = useState<File | null>(null)
   const [titleFontFile, setTitleFontFile] = useState<File | null>(null)
@@ -373,7 +376,8 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
       if (error) throw error
       setForm(data as Company); saveCompany(data as Company)
       setLogo(null); setTitleFontFile(null); setTextFontFile(null)
-      setMessage('Cambios guardados.')
+      setMessage('')
+      avisar('Cambios guardados.')
     } catch (e) { setMessage(mensajeError(e, 'No se pudieron guardar los cambios.')) }
     finally { setSaving(false) }
   }
@@ -411,6 +415,7 @@ function CompanySettings({ company, saveCompany, onError, onDelete }: {
 }
 
 function CompanyUsers({ companyId, onError }: { companyId: string; onError: (message: string) => void }) {
+  const { confirmar, avisar, mostrarDatos } = useAvisos()
   const [users, setUsers] = useState<UserRow[] | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -429,18 +434,18 @@ function CompanyUsers({ companyId, onError }: { companyId: string; onError: (mes
     event.preventDefault(); setBusy(true); onError('')
     try {
       await platformAction({ action: 'create-company-user', companyId, email: email.trim(), password, name: name.trim(), role })
-      alert(`Usuario creado.\n\nCorreo: ${email.trim()}\nContraseña inicial: ${password}\n\nAnotá la contraseña: no se vuelve a mostrar.`)
+      void mostrarDatos({ titulo: 'Usuario creado', mensaje: 'Pasale estos datos por un canal privado.', datos: `Correo: ${email.trim()}\nContraseña inicial: ${password}`, advertencia: 'La contraseña no se vuelve a mostrar.' })
       setName(''); setEmail(''); setPassword(generarClave()); await load()
     } catch (e) { onError(mensajeError(e, 'No se pudo crear el usuario.')) }
     finally { setBusy(false) }
   }
   const changeRole = async (user: UserRow, nextRole: 'admin' | 'member') => {
-    try { await platformAction({ action: 'update-role', userId: user.user_id, role: nextRole }); await load() }
+    try { await platformAction({ action: 'update-role', userId: user.user_id, role: nextRole }); avisar('Rol actualizado.'); await load() }
     catch (e) { onError(mensajeError(e, 'No se pudo cambiar el rol.')) }
   }
   const deleteUser = async (user: UserRow) => {
-    if (!confirm(`¿Eliminar a ${user.name || user.email}? Ya no podrá ingresar.`)) return
-    try { await platformAction({ action: 'delete-user', userId: user.user_id }); await load() }
+    if (!await confirmar({ titulo: `¿Eliminar a ${user.name || user.email}?`, mensaje: 'Ya no va a poder ingresar.', confirmar: 'Eliminar usuario', peligro: true })) return
+    try { await platformAction({ action: 'delete-user', userId: user.user_id }); avisar('Usuario eliminado.'); await load() }
     catch (e) { onError(mensajeError(e, 'No se pudo eliminar el usuario.')) }
   }
 
@@ -460,7 +465,7 @@ function CompanyUsers({ companyId, onError }: { companyId: string; onError: (mes
     </form>
     {resetUser && <ClaveDialog titulo={`Nueva contraseña para ${resetUser.name || resetUser.email}`} alCerrar={() => setResetUser(null)} alGuardar={async (nextPassword) => {
       await platformAction({ action: 'reset-password', userId: resetUser.user_id, password: nextPassword })
-      alert(`Contraseña cambiada.\n\nCorreo: ${resetUser.email}\nContraseña: ${nextPassword}`)
+      void mostrarDatos({ titulo: 'Contraseña cambiada', mensaje: 'Pasale los datos nuevos por un canal privado.', datos: `Correo: ${resetUser.email}\nContraseña: ${nextPassword}`, advertencia: 'La contraseña no se vuelve a mostrar.' })
       setResetUser(null)
     }} />}
   </>

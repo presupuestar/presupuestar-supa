@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { SesionProvider, useSesion } from './context/Sesion'
+import { AvisosProvider } from './components/Avisos'
 import type { PermisoEmpresa } from './lib/tipos'
 
 const Login = lazy(() => import('./pages/Login').then(({ Login }) => ({ default: Login })))
@@ -48,6 +49,7 @@ function Protegida({ children, permiso, cualquiera }: {
 export default function App() {
   return (
     <SesionProvider>
+      <AvisosProvider>
       <BrowserRouter>
         <Suspense fallback={<CargandoPantalla />}>
           <Routes>
@@ -67,6 +69,7 @@ export default function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
+      </AvisosProvider>
     </SesionProvider>
   )
 }

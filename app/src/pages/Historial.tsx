@@ -1,3 +1,5 @@
+import { CargandoFilas, EstadoVacio } from '../components/EstadoVacio'
+import { useAvisos } from '../components/Avisos'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
@@ -37,6 +39,7 @@ function SeccionDesplegable({ titulo, children }: { titulo: React.ReactNode; chi
 
 export function Historial() {
   const { empresa, usuario } = useSesion()
+  const { confirmar, avisar } = useAvisos()
   const esAdmin = usuario?.rol === 'admin'
   const puedeEliminar = (presupuesto: Presupuesto) =>
     tienePermiso(usuario, 'quotes.delete_own') && (esAdmin || presupuesto.vendedor === usuario?.id)
@@ -160,8 +163,9 @@ export function Historial() {
   }
 
   const eliminar = async (p: Presupuesto) => {
-    if (!confirm(`¿Eliminar el presupuesto N° ${String(p.numero).padStart(4, '0')}?\n\nEsta acción no se puede deshacer.`)) return
-    try { await repositorio.presupuestos.eliminar(p.id); await cargar() }
+    const ok = await confirmar({ titulo: `¿Eliminar el presupuesto N° ${String(p.numero).padStart(4, '0')}?`, mensaje: 'Esta acción no se puede deshacer.', confirmar: 'Eliminar presupuesto', peligro: true })
+    if (!ok) return
+    try { await repositorio.presupuestos.eliminar(p.id); avisar('Presupuesto eliminado.'); await cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar el presupuesto.')) }
   }
 
@@ -261,16 +265,22 @@ export function Historial() {
               {vendedores.map(([clave, nombre]) => <option key={clave || 'sin'} value={clave}>{nombre}</option>)}
             </select>
           )}
-          {mes && <button className="link" onClick={() => setMes(null)}>Quitar filtro: {nombreMes(mes)}</button>}
+          {mes && <span className="filtro-chip">Mes: {nombreMes(mes)}<button type="button" aria-label={`Quitar el filtro de ${nombreMes(mes)}`} title="Quitar filtro" onClick={() => setMes(null)}>×</button></span>}
         </div>
 
+        {lista !== null && lista.length === 0 ? (
+          <EstadoVacio icono="lista" titulo={esAdmin ? 'Todavía no hay presupuestos' : 'Todavía no hiciste presupuestos'}
+            acciones={tienePermiso(usuario, 'quotes.create') && <Link className="btn chico" to="/nuevo">Crear el primero</Link>}>
+            Acá vas a ver cada presupuesto con su estado, su total y el PDF para descargar.
+          </EstadoVacio>
+        ) : (
         <div className="tabla-caja historial-caja">
           <table className="tabla tabla-historial">
             <thead><tr><th>Cliente</th><th>N°</th><th>Fecha</th><th>Vendedor</th><th className="num">Total</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
             <tbody>
-              {lista === null && <tr><td colSpan={cols} className="vacio">Cargando…</td></tr>}
+              {lista === null && <CargandoFilas columnas={cols} />}
               {lista !== null && visibles.length === 0 && (
-                <tr><td colSpan={cols} className="vacio">{lista.length === 0 ? 'Todavía no hay presupuestos. Creá el primero.' : 'No hay presupuestos que coincidan con el filtro.'}</td></tr>
+                <tr className="fila-vacia"><td colSpan={cols} className="vacio">No hay presupuestos que coincidan con el filtro. <button className="link" onClick={() => { setBusqueda(''); setEstado('todos'); setVendedor('todos'); setMes(null) }}>Ver todos</button></td></tr>
               )}
               {visibles.map((p) => (
                 <tr key={p.id}>
@@ -308,6 +318,7 @@ export function Historial() {
             )}
           </table>
         </div>
+        )}
       </main>
     </Layout>
   )

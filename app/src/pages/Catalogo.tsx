@@ -1,3 +1,5 @@
+import { EstadoVacio, Silueta } from '../components/EstadoVacio'
+import { useAvisos } from '../components/Avisos'
 import { SelectorArchivo } from '../components/SelectorArchivo'
 import { cerrarConFondo } from '../lib/dialogo'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
@@ -35,6 +37,7 @@ interface CandidatoImportacion {
 }
 
 export function Catalogo() {
+  const { confirmar, avisar } = useAvisos()
   const pdfInput = useRef<HTMLInputElement>(null)
   const revisionFinal = useRef<HTMLDivElement>(null)
   const confirmacionRef = useRef<HTMLDialogElement>(null)
@@ -102,12 +105,13 @@ export function Catalogo() {
   const cantidadSeleccionada = seleccionados.size
 
   const alternar = async (i: Item) => {
-    try { await repositorio.items.actualizar(i.id, { activo: !i.activo }); cargar() }
+    try { await repositorio.items.actualizar(i.id, { activo: !i.activo }); avisar(i.activo ? 'Ítem desactivado.' : 'Ítem activado.'); cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo cambiar el estado del ítem.')) }
   }
   const eliminar = async (i: Item) => {
-    if (!confirm(`¿Eliminar "${i.nombre}" del catálogo?\n\nLos presupuestos ya hechos no cambian. Si solo querés dejar de usarlo, es mejor desactivarlo.`)) return
-    try { await repositorio.items.eliminar(i.id); cargar() }
+    const ok = await confirmar({ titulo: `¿Eliminar «${i.nombre}»?`, mensaje: 'Los presupuestos ya hechos no cambian. Si solo querés dejar de usarlo, es mejor desactivarlo.', confirmar: 'Eliminar ítem', peligro: true })
+    if (!ok) return
+    try { await repositorio.items.eliminar(i.id); avisar('Ítem eliminado del catálogo.'); cargar() }
     catch (e) { setError(mensajeError(e, 'No se pudo eliminar el ítem.')) }
   }
 
@@ -421,7 +425,12 @@ export function Catalogo() {
         </dialog>
 
         {secciones.length === 0 ? (
-          <div className="tabla-caja"><p className="vacio">{items === null ? 'Cargando…' : items.length === 0 ? 'Todavía no cargaste ítems. Empezá con el primero.' : 'No hay ítems que coincidan.'}</p></div>
+          items === null ? <div className="tabla-caja cargando-caja"><span className="sr">Cargando…</span>{[0, 1, 2].map((i) => <span className="fila-cargando-linea" key={i}><Silueta ancho="40%" /><Silueta ancho="20%" /><Silueta ancho="12%" /></span>)}</div>
+          : items.length === 0 ? <EstadoVacio icono="catalogo" titulo="Tu catálogo está vacío"
+              acciones={<><button type="button" className="btn chico" onClick={() => setEditando('nuevo')}>Cargar un ítem</button><button type="button" className="btn sec chico" onClick={() => { if (importadorPdf.current) { importadorPdf.current.open = true; importadorPdf.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) } }}>Importar desde PDF</button></>}>
+              Cargá los productos o servicios que vendés con su precio. Después los elegís al armar cada presupuesto.
+            </EstadoVacio>
+          : <div className="tabla-caja"><p className="vacio">No hay ítems que coincidan con la búsqueda o el filtro.</p></div>
         ) : secciones.map(([nombreProveedor, productos]) => (
         <details className="seccion-proveedor catalogo-desplegable" key={nombreProveedor}>
           <summary className="catalogo-desplegable-resumen">
@@ -576,7 +585,7 @@ export function Catalogo() {
         <FormItem
           item={editando === 'nuevo' ? null : editando}
           alCerrar={() => setEditando(null)}
-          alGuardar={() => { setEditando(null); cargar() }}
+          alGuardar={() => { setEditando(null); avisar('Ítem guardado.'); cargar() }}
         />
       )}
     </Layout>

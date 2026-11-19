@@ -1,3 +1,4 @@
+import { Silueta } from '../components/EstadoVacio'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { tienePermiso, useSesion } from '../context/Sesion'
@@ -69,6 +70,17 @@ export function Inicio() {
             {caducados === 1 ? 'Hay 1 presupuesto pendiente que superó su fecha de vigencia.' : `Hay ${caducados} presupuestos pendientes que superaron su fecha de vigencia.`}
             {' '}<Link className="link" to="/historial">Revisarlos en el historial</Link>
           </p>
+        )}
+
+        {!cargado && puedeVer && !error && (
+          <section className="resumen" aria-busy="true">
+            <span className="sr">Cargando el resumen…</span>
+            <Silueta alto={24} ancho={260} />
+            <div className="resumen-mes">
+              <div className="grafico-circular silueta-tarjeta"><Silueta alto={18} ancho="55%" /><div className="silueta-torta"><Silueta alto={150} ancho={150} redondeo={999} /><span><Silueta /><Silueta ancho="80%" /><Silueta ancho="65%" /></span></div></div>
+            </div>
+            <div className="graficos-barras"><div className="grafico-barras silueta-tarjeta"><Silueta alto={18} ancho="40%" /><Silueta alto={14} /><Silueta alto={14} ancho="70%" /></div></div>
+          </section>
         )}
 
         {cargado && !mes && puedeVer && (

@@ -1,3 +1,5 @@
+import { CargandoFilas, EstadoVacio } from '../components/EstadoVacio'
+import { useAvisos } from '../components/Avisos'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
@@ -16,6 +18,7 @@ const blankClient: Omit<Cliente, 'id' | 'empresa'> = {
 
 export function Clientes() {
   const { usuario } = useSesion()
+  const { confirmar, avisar } = useAvisos()
   const puedeVerPresupuestos = tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')
   const [clients, setClients] = useState<Cliente[] | null>(null)
   const [search, setSearch] = useState('')
@@ -27,9 +30,21 @@ export function Clientes() {
   const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
 
+  const [resumenClientes, setResumenClientes] = useState<Map<string, { cantidad: number; ultima: string }>>(new Map())
   const loadClients = async () => {
     const data = await repositorio.clientes.listar()
     setClients(data)
+    if (puedeVerPresupuestos) {
+      // Cantidad de presupuestos y fecha del último por cliente (solo los que la persona puede ver).
+      const { data: filas } = await filtrarPorAlcance(supabase.from('quotes').select('client_id,issue_date,created_at').not('client_id', 'is', null))
+      const resumen = new Map<string, { cantidad: number; ultima: string }>()
+      for (const f of filas ?? []) {
+        const fecha = String(f.issue_date || f.created_at || '')
+        const actual = resumen.get(String(f.client_id)) ?? { cantidad: 0, ultima: '' }
+        resumen.set(String(f.client_id), { cantidad: actual.cantidad + 1, ultima: fecha > actual.ultima ? fecha : actual.ultima })
+      }
+      setResumenClientes(resumen)
+    }
   }
   useEffect(() => {
     loadClients().catch((e: unknown) => setError(mensajeError(e, 'No se pudieron cargar los clientes.')))
@@ -110,11 +125,13 @@ export function Clientes() {
   }
 
   const remove = async (client: Cliente) => {
-    if (!confirm(`¿Suprimir a ${client.nombre}? Deja de verse en la cartera y no se puede usar en presupuestos nuevos. Los presupuestos ya emitidos conservan su copia y el vínculo histórico.`)) return
+    const ok = await confirmar({ titulo: `¿Eliminar a ${client.nombre}?`, mensaje: 'Deja de verse en la cartera y no se puede usar en presupuestos nuevos. Los presupuestos ya emitidos conservan su copia y el vínculo histórico.', confirmar: 'Eliminar cliente', peligro: true })
+    if (!ok) return
     setError('')
     try {
       await repositorio.clientes.eliminar(client.id)
       if (selected?.id === client.id) setSelected(null)
+      avisar('Cliente eliminado.')
       await loadClients()
     } catch (e) { setError(mensajeError(e, 'No se pudo eliminar el cliente.')) }
   }
@@ -138,7 +155,7 @@ export function Clientes() {
       <div className="tabla-caja"><table className="tabla">
         <thead><tr><th>N°</th><th>Fecha</th><th>Vendedor</th><th>Total</th><th>Estado</th><th /></tr></thead>
         <tbody>
-          {quotes === null && <tr><td className="vacio" colSpan={6}>Cargando historial…</td></tr>}
+          {quotes === null && <CargandoFilas columnas={6} filas={3} />}
           {quotes?.length === 0 && <tr><td className="vacio" colSpan={6}>Este cliente todavía no tiene presupuestos vinculados.</td></tr>}
           {quotes?.map((quote) => <tr key={quote.id}>
             <td><strong>{String(quote.numero).padStart(4, '0')}</strong></td>
@@ -161,6 +178,7 @@ export function Clientes() {
       </>}
       {editing && <ClientForm client={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={async () => {
         setEditing(null)
+        avisar('Cliente guardado.')
         const fresh = await repositorio.clientes.listar()
         setClients(fresh)
         setSelected(fresh.find((c) => c.id === selected.id) ?? selected)
@@ -178,22 +196,33 @@ export function Clientes() {
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     <div className="filtros"><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, correo o teléfono…" aria-label="Buscar clientes" /></div>
+    {clients !== null && clients.length === 0 ? (
+      <EstadoVacio icono="personas" titulo="Todavía no hay clientes guardados"
+        acciones={<button className="btn chico" onClick={() => setEditing('new')}>Agregar cliente</button>}>
+        Los clientes se guardan solos al emitir un presupuesto, o podés cargarlos acá. Después los elegís en un clic y ves su historial.
+      </EstadoVacio>
+    ) : (
     <div className="tabla-caja tabla-clientes-caja"><table className="tabla tabla-clientes">
-      <thead><tr><th>Cliente</th><th>Correo</th><th>Teléfono</th><th>Documento</th><th><span className="sr">Acciones</span></th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Correo</th><th>Teléfono</th><th>Documento</th>{puedeVerPresupuestos && <th>Presupuestos</th>}<th><span className="sr">Acciones</span></th></tr></thead>
       <tbody>
-        {clients === null && <tr className="fila-vacia"><td className="vacio" colSpan={5}>Cargando…</td></tr>}
-        {clients !== null && visibleClients.length === 0 && <tr className="fila-vacia"><td className="vacio" colSpan={5}>{clients.length ? 'No hay coincidencias.' : 'Todavía no hay clientes guardados.'}</td></tr>}
+        {clients === null && <CargandoFilas columnas={puedeVerPresupuestos ? 6 : 5} />}
+        {clients !== null && clients.length > 0 && visibleClients.length === 0 && <tr className="fila-vacia"><td className="vacio" colSpan={puedeVerPresupuestos ? 6 : 5}>No hay clientes que coincidan con «{search.trim()}».</td></tr>}
         {visibleClients.map((client) => <tr key={client.id}>
           <td className="cliente-celda-nombre"><button className="link cliente-nombre" onClick={() => { setSelected(client); setQuotePage(0) }}>{client.nombre}</button></td>
           <td data-label="Correo">{client.email || <span className="sin-dato">—</span>}</td>
           <td data-label="Teléfono">{client.telefono || <span className="sin-dato">—</span>}</td>
           <td data-label="Documento">{client.documento || <span className="sin-dato">—</span>}</td>
+          {puedeVerPresupuestos && <td data-label="Presupuestos" className="cliente-presupuestos">{resumenClientes.get(client.id)
+            ? <><strong>{resumenClientes.get(client.id)!.cantidad}</strong><small>último {fechaCorta(resumenClientes.get(client.id)!.ultima)}</small></>
+            : <span className="sin-dato">Ninguno</span>}</td>}
           <td className="acciones"><button className="link" onClick={() => setEditing(client)}>Editar</button><button className="link peligro" onClick={() => void remove(client)}>Eliminar</button></td>
         </tr>)}
       </tbody>
     </table></div>
+    )}
     {editing && <ClientForm client={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={async () => {
       setEditing(null)
+      avisar('Cliente guardado.')
       const fresh = await repositorio.clientes.listar()
       setClients(fresh)
     }} />}
