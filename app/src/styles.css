@@ -1194,3 +1194,123 @@ input,textarea{caret-color:var(--acento)}
 
 /* Estado sin permiso para cambiarlo: mismo color que el selector, sin flecha. */
 .estado-fijo{display:inline-block;background-image:none;padding-right:12px;cursor:default}
+
+/* ═════════ Vidrio: superficies translúcidas con desenfoque, inspiradas en iOS ═════════
+   Todo el material sale de estos tokens; para volver a superficies opacas alcanza con
+   quitar este bloque. */
+:root{
+  --vidrio:rgba(255,255,255,.58);
+  --vidrio-fuerte:rgba(255,255,255,.74);
+  --vidrio-borde:rgba(255,255,255,.75);
+  --vidrio-contorno:rgba(16,24,40,.07);
+  --vidrio-brillo:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(255,255,255,.25);
+  --vidrio-sombra:0 1px 2px rgba(16,24,40,.04),0 10px 30px -8px rgba(16,24,40,.12);
+  --vidrio-desenfoque:blur(22px) saturate(1.8);
+  --radio-vidrio:22px;
+}
+:root[data-tema=oscuro]{
+  --vidrio:rgba(30,38,52,.52);
+  --vidrio-fuerte:rgba(26,33,46,.74);
+  --vidrio-borde:rgba(255,255,255,.10);
+  --vidrio-contorno:rgba(0,0,0,.35);
+  --vidrio-brillo:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 0 rgba(255,255,255,.03);
+  --vidrio-sombra:0 1px 2px rgba(0,0,0,.4),0 12px 32px -8px rgba(0,0,0,.5);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-tema=claro]){
+    --vidrio:rgba(30,38,52,.52);
+    --vidrio-fuerte:rgba(26,33,46,.74);
+    --vidrio-borde:rgba(255,255,255,.10);
+    --vidrio-contorno:rgba(0,0,0,.35);
+    --vidrio-brillo:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 0 rgba(255,255,255,.03);
+    --vidrio-sombra:0 1px 2px rgba(0,0,0,.4),0 12px 32px -8px rgba(0,0,0,.5);
+  }
+}
+
+/* Fondo: un tinte suave del color de la empresa arriba, para que el vidrio tenga qué refractar. */
+:root{--fondo-color-1:color-mix(in srgb,var(--acento) 38%,transparent);--fondo-color-2:color-mix(in srgb,var(--primario) 26%,transparent);--fondo-color-3:color-mix(in srgb,var(--acento) 22%,transparent)}
+:root[data-tema=oscuro]{--fondo-color-1:color-mix(in srgb,var(--acento) 28%,transparent);--fondo-color-2:color-mix(in srgb,var(--primario) 55%,transparent);--fondo-color-3:color-mix(in srgb,var(--acento) 16%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-tema=claro]){--fondo-color-1:color-mix(in srgb,var(--acento) 28%,transparent);--fondo-color-2:color-mix(in srgb,var(--primario) 55%,transparent);--fondo-color-3:color-mix(in srgb,var(--acento) 16%,transparent)}}
+/* Fondo con los colores de la empresa, quieto mientras se desplaza el contenido: es lo que
+   el vidrio deja ver y desenfoca. */
+body{background:
+  linear-gradient(135deg,var(--fondo-color-1) 0%,transparent 45%),
+  linear-gradient(225deg,var(--fondo-color-2) 0%,transparent 50%),
+  linear-gradient(0deg,var(--fondo-color-3) 0%,transparent 40%),
+  var(--niebla);
+  background-attachment:fixed}
+
+/* Material base */
+.panel,.tabla-caja,.grafico-circular,.grafico-barras,.ultimos-lista,.inicio-vacio,.listo,
+.barra-seleccion-catalogo,.seccion-proveedor>.catalogo-desplegable-resumen,.tarjetas article,
+.lista-roles>li,.selector-archivo-caja,.seccion-desplegable,.resultados-agregar-item,.catalogo-menu-fila>div{
+  background:var(--vidrio);
+  border:1px solid var(--vidrio-borde);
+  box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),var(--vidrio-sombra);
+  -webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque);
+}
+.panel,.grafico-circular,.grafico-barras,.ultimos-lista,.inicio-vacio,.listo{border-radius:var(--radio-vidrio)}
+.tabla-caja{border-radius:20px}
+@media (min-width:821px){.tabla-caja .tabla tbody tr{background:transparent}}
+.resultados-agregar-item,.catalogo-menu-fila>div{background:var(--vidrio-fuerte)}
+
+/* Barra superior flotante */
+.barra{position:sticky;top:10px;margin:10px 16px 0;border-radius:24px;border:1px solid var(--vidrio-borde);border-bottom:1px solid var(--vidrio-borde);
+  background:var(--vidrio-fuerte);box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),var(--vidrio-sombra);
+  -webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque)}
+.barra nav a{border-radius:999px}
+.barra nav a:hover{background:color-mix(in srgb,var(--tinta) 6%,transparent)}
+.barra nav a.activo,.barra .activo{background:var(--vidrio-fuerte);box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),0 2px 8px rgba(16,24,40,.08)}
+.barra .menu-toggle,.boton-tema,.salir{background:transparent;border-color:var(--vidrio-borde);border-radius:999px}
+
+/* Botones tipo píldora con reflejo */
+.btn{border-radius:999px}
+.btn:not(.sec){background-image:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 55%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 2px rgba(16,24,40,.12),0 6px 16px -6px color-mix(in srgb,var(--primario) 60%,transparent)}
+.btn.sec{background:var(--vidrio);border-color:color-mix(in srgb,var(--marca-texto) 55%,transparent);
+  -webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque);box-shadow:var(--vidrio-brillo)}
+
+/* Campos: más claros que la tarjeta, como un hueco en el vidrio */
+.campo input,.campo select,.campo textarea,.linea input,.linea textarea,.filtros input[type=search],.filtro-estado,.ajuste-general,.login-form input{
+  background:color-mix(in srgb,var(--superficie) 72%,transparent);border-radius:12px}
+
+/* Barra del total y pie de importación: flotan sobre el contenido */
+.barra-total{left:16px;right:16px;bottom:12px;border-radius:24px;border:1px solid var(--vidrio-borde);background:var(--vidrio-fuerte);
+  box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),0 18px 40px -12px rgba(16,24,40,.28);
+  -webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque)}
+.importacion-pie{background:var(--vidrio-fuerte);-webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque)}
+
+/* Ventanas y avisos */
+dialog{background:var(--vidrio-fuerte);border:1px solid var(--vidrio-borde);border-radius:26px;
+  box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),0 30px 80px rgba(16,24,40,.30);
+  -webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8)}
+dialog::backdrop{background:rgba(16,24,40,.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.confirmacion-eliminacion-tarjeta,.confirmacion-eliminacion-acciones{background:transparent}
+.aviso-breve{border-radius:999px;background:rgba(16,24,40,.78);border:1px solid rgba(255,255,255,.12);
+  -webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6)}
+
+/* Login: la tarjeta también es de vidrio */
+.login-lado,.login-form{background:var(--vidrio-fuerte);border-color:var(--vidrio-borde);-webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque)}
+.login-form{box-shadow:var(--vidrio-brillo),var(--vidrio-sombra)}
+.login{background:transparent}
+
+@media (max-width:820px){
+  /* En celular las tablas se vuelven tarjetas: el contenedor desaparece y cada fila es de vidrio. */
+  .historial-caja,.tabla-clientes-caja,.seccion-desplegable .tabla-caja,.seccion-proveedor>.tabla-caja,.tabla-caja:has(.tabla-equipo){
+    background:transparent;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+  .tabla-historial tbody tr,.tabla-clientes tbody tr:not(.fila-vacia),.tabla-catalogo tbody tr:not(.fila-vacia),.tabla-equipo tbody tr:not(.fila-vacia),.seccion-desplegable .resumen-tabla tbody tr{
+    background:var(--vidrio);border:1px solid var(--vidrio-borde);border-radius:18px;
+    box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),var(--vidrio-sombra);
+    -webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque)}
+  .tabla-historial .campo-total{background:color-mix(in srgb,var(--acento) 14%,transparent)}
+  .barra{top:8px;margin:8px 10px 0;border-radius:20px}
+  .barra-total{left:8px;right:8px;bottom:8px;border-radius:20px}
+}
+/* Sin desenfoque disponible: superficies casi opacas para que el texto se lea igual */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root{--vidrio:rgba(255,255,255,.94);--vidrio-fuerte:rgba(255,255,255,.97)}
+  :root[data-tema=oscuro]{--vidrio:rgba(26,33,46,.96);--vidrio-fuerte:rgba(26,33,46,.98)}
+}
+@media (prefers-reduced-transparency:reduce){
+  :root{--vidrio:var(--superficie);--vidrio-fuerte:var(--superficie)}
+}

@@ -1,6 +1,7 @@
 import { CargandoFilas, EstadoVacio } from '../components/EstadoVacio'
 import { useAvisos } from '../components/Avisos'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { cerrarConFondo } from '../lib/dialogo'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { tienePermiso, useSesion } from '../context/Sesion'
@@ -236,6 +237,9 @@ function ClientForm({ client, close, saved }: { client: Cliente | null; close: (
   } : blankClient)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  // Ventana modal: fondo atenuado, foco adentro y se cierra con Esc o tocando afuera.
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => { if (!ref.current?.open) ref.current?.showModal() }, [])
   const change = (key: keyof typeof blankClient, value: string) => setForm((current) => ({ ...current, [key]: value }))
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -248,7 +252,7 @@ function ClientForm({ client, close, saved }: { client: Cliente | null; close: (
     } catch (reason) { setError(mensajeError(reason, 'No se pudo guardar el cliente.')) }
     finally { setSaving(false) }
   }
-  return <dialog className="ventana" open><form className="form" onSubmit={(event) => void submit(event)}>
+  return <dialog ref={ref} className="ventana" onClose={close} {...cerrarConFondo(() => { if (!saving) ref.current?.close() })}><form className="form" onSubmit={(event) => void submit(event)}>
     <h2>{client ? 'Editar cliente' : 'Nuevo cliente'}</h2>
     <label className="campo">Nombre y apellido<input value={form.nombre} onChange={(e) => change('nombre', e.target.value)} autoFocus required maxLength={160} /></label>
     <div className="dos">
