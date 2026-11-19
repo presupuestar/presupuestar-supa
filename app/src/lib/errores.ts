@@ -105,6 +105,8 @@ const POR_MENSAJE: [RegExp, string | ((m: RegExpMatchArray) => string)][] = [
   // Edge Functions y red
   [/edge function returned a non-2xx/i, 'El servidor rechazó la operación. Probá de nuevo.'],
   [/failed to send a request to the edge function|relay error/i, SIN_CONEXION],
+  // Una pestaña abierta desde antes de publicar una versión nueva pide archivos que ya no existen.
+  [/dynamically imported module|importing a module script failed|module script failed|unable to preload css|chunkloaderror/i, 'Hay una versión nueva de la app. Recargá la página (F5) y probá de nuevo.'],
   [/failed to fetch|networkerror|load failed|network request failed|fetch failed|err_internet_disconnected/i, SIN_CONEXION],
   [/aborted|timed? ?out/i, 'La operación tardó demasiado. Revisá tu conexión y probá de nuevo.'],
   // Lector de PDF (pdf.js)
