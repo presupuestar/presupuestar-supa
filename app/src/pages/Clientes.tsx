@@ -11,6 +11,7 @@ import { filtrarPorAlcance, repositorio } from '../lib/repositorio'
 import { supabase } from '../lib/supabase'
 import type { Cliente, Estado, Presupuesto } from '../lib/tipos'
 import { ETIQUETA, fechaVigencia, presupuestoCaducado } from '../lib/estados'
+import { Importe } from '../components/Importe'
 
 const pageSize = 25
 const blankClient: Omit<Cliente, 'id' | 'empresa'> = {
@@ -104,6 +105,10 @@ export function Clientes() {
       `${client.nombre} ${client.email} ${client.telefono} ${client.documento ?? ''}`.toLocaleLowerCase().includes(term))
   }, [clients, search])
 
+  // Una columna vacía en todas las filas solo agrega ruido.
+  const hayDocumentos = (clients ?? []).some((c) => Boolean(c.documento?.trim()))
+  const columnasClientes = (puedeVerPresupuestos ? 6 : 5) - (hayDocumentos ? 0 : 1)
+
   const exportar = async () => {
     setExportando(true)
     setError('')
@@ -153,18 +158,18 @@ export function Clientes() {
       {error && <p className="error" role="alert">{error}</p>}
       {!puedeVerPresupuestos && <p className="vacio-linea">Tu rol no tiene permiso para consultar presupuestos.</p>}
       {puedeVerPresupuestos && <>
-      <div className="tabla-caja"><table className="tabla">
+      <div className="tabla-caja tabla-cliente-presupuestos-caja"><table className="tabla tabla-cliente-presupuestos">
         <thead><tr><th>N°</th><th>Fecha</th><th>Vendedor</th><th>Total</th><th>Estado</th><th /></tr></thead>
         <tbody>
           {quotes === null && <CargandoFilas columnas={6} filas={3} />}
           {quotes?.length === 0 && <tr><td className="vacio" colSpan={6}>Este cliente todavía no tiene presupuestos vinculados.</td></tr>}
           {quotes?.map((quote) => <tr key={quote.id}>
-            <td><strong>{String(quote.numero).padStart(4, '0')}</strong></td>
-            <td>{fechaCorta(quote.fechaEmision || quote.created)}</td>
-            <td>{quote.vendedorNombre || '—'}</td>
-            <td>{importeEnMoneda(quote.total, quote.moneda)}</td>
-            <td>{presupuestoCaducado(quote) ? <span className="pill caducado">Caducado · venció el {fechaCorta(fechaVigencia(quote.fechaEmision, quote.validezDias, quote.vigenteHasta))}</span> : ETIQUETA[quote.estado]}</td>
-            <td>{(usuario?.rol === 'admin' || (tienePermiso(usuario, 'quotes.update_own') && quote.vendedor === usuario?.id))
+            <td className="cp-numero"><strong>{String(quote.numero).padStart(4, '0')}</strong></td>
+            <td className="cp-fecha">{fechaCorta(quote.fechaEmision || quote.created)}</td>
+            <td className="cp-vendedor">{quote.vendedorNombre || '—'}</td>
+            <td className="cp-total"><Importe valor={quote.total} moneda={quote.moneda} /></td>
+            <td className="cp-estado">{presupuestoCaducado(quote) ? <span className="pill caducado">Caducado · venció el {fechaCorta(fechaVigencia(quote.fechaEmision, quote.validezDias, quote.vigenteHasta))}</span> : ETIQUETA[quote.estado]}</td>
+            <td className="cp-acciones">{(usuario?.rol === 'admin' || (tienePermiso(usuario, 'quotes.update_own') && quote.vendedor === usuario?.id))
               && (quote.estado === 'borrador' || quote.estado === 'pendiente' || quote.estado === 'aceptado')
               ? <Link className="link" to={`/presupuestos/${quote.id}/editar`}>Editar</Link>
               : null}</td>
@@ -204,17 +209,17 @@ export function Clientes() {
       </EstadoVacio>
     ) : (
     <div className="tabla-caja tabla-clientes-caja"><table className="tabla tabla-clientes">
-      <thead><tr><th>Cliente</th><th>Correo</th><th>Teléfono</th><th>Documento</th>{puedeVerPresupuestos && <th>Presupuestos</th>}<th><span className="sr">Acciones</span></th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Correo</th><th>Teléfono</th>{hayDocumentos && <th>Documento</th>}{puedeVerPresupuestos && <th>Presupuestos</th>}<th><span className="sr">Acciones</span></th></tr></thead>
       <tbody>
-        {clients === null && <CargandoFilas columnas={puedeVerPresupuestos ? 6 : 5} />}
-        {clients !== null && clients.length > 0 && visibleClients.length === 0 && <tr className="fila-vacia"><td className="vacio" colSpan={puedeVerPresupuestos ? 6 : 5}>No hay clientes que coincidan con «{search.trim()}».</td></tr>}
+        {clients === null && <CargandoFilas columnas={columnasClientes} />}
+        {clients !== null && clients.length > 0 && visibleClients.length === 0 && <tr className="fila-vacia"><td className="vacio" colSpan={columnasClientes}>No hay clientes que coincidan con «{search.trim()}».</td></tr>}
         {visibleClients.map((client) => <tr key={client.id}>
           <td className="cliente-celda-nombre"><button className="link cliente-nombre" onClick={() => { setSelected(client); setQuotePage(0) }}>{client.nombre}</button></td>
           <td data-label="Correo">{client.email || <span className="sin-dato">—</span>}</td>
           <td data-label="Teléfono">{client.telefono || <span className="sin-dato">—</span>}</td>
-          <td data-label="Documento">{client.documento || <span className="sin-dato">—</span>}</td>
+          {hayDocumentos && <td data-label="Documento">{client.documento || <span className="sin-dato">—</span>}</td>}
           {puedeVerPresupuestos && <td data-label="Presupuestos" className="cliente-presupuestos">{resumenClientes.get(client.id)
-            ? <><strong>{resumenClientes.get(client.id)!.cantidad}</strong><small>último {fechaCorta(resumenClientes.get(client.id)!.ultima)}</small></>
+            ? <><strong>{resumenClientes.get(client.id)!.cantidad} {resumenClientes.get(client.id)!.cantidad === 1 ? 'presupuesto' : 'presupuestos'}</strong><small>último {fechaCorta(resumenClientes.get(client.id)!.ultima)}</small></>
             : <span className="sin-dato">Ninguno</span>}</td>}
           <td className="acciones"><button className="link" onClick={() => setEditing(client)}>Editar</button><button className="link peligro" onClick={() => void remove(client)}>Eliminar</button></td>
         </tr>)}

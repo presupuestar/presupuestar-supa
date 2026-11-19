@@ -15,6 +15,8 @@ import { Importe } from '../components/Importe'
 import { Iniciales } from '../components/Iniciales'
 import { haceCuanto } from '../lib/tiempo'
 
+/** Mes corto para las barras: «nov 2026». */
+const mesCorto = (aaaamm: string) => new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }).replace('.', '').replace(' de ', ' ')
 const nombreMes = (aaaamm: string) =>
   new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
 
@@ -54,6 +56,8 @@ export function Inicio() {
   }, [usuario, empresa?.validezDias])
 
   const mes = meses[0]
+  // El vendedor solo aporta si hay más de uno.
+  const variosVendedores = new Set(ultimos.map((p) => p.vendedor)).size > 1
   const ahora = new Date()
   const fechaHoy = ahora.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
   const nombre = nombreVisible(usuario?.name)
@@ -70,7 +74,7 @@ export function Inicio() {
       .slice(-12)
       .map((m) => ({
         clave: m.mes,
-        etiqueta: nombreMes(m.mes),
+        etiqueta: mesCorto(m.mes),
         valor: m.presupuestado,
         valorTexto: importeEnMoneda(m.presupuestado, m.moneda),
         color: `mes-${Number(m.mes.slice(5, 7))}` as ColorSegmento,
@@ -127,6 +131,31 @@ export function Inicio() {
         {mes && puedeVer && (
           <section className="resumen">
             <div className="encabezado"><h2>Panorama de {nombreMes(mes.mes)}</h2><Link className="link" to="/historial">Ver historial</Link></div>
+            {/* Las cifras que importan, primero y en grande; los gráficos las explican debajo. */}
+            {resumenMes.map((m) => (
+              <dl className="kpis" key={`kpis-${m.moneda}`} aria-label={`Resumen del mes en ${normalizarMoneda(m.moneda)}`}>
+                <div className="kpi principal">
+                  <dt>Presupuestado</dt>
+                  <dd><Importe valor={m.presupuestado} moneda={m.moneda} /></dd>
+                  <small>{m.cantidad === 1 ? '1 presupuesto emitido' : `${m.cantidad} presupuestos emitidos`}</small>
+                </div>
+                <div className="kpi aceptado">
+                  <dt>Aceptado</dt>
+                  <dd><Importe valor={m.aceptado} moneda={m.moneda} /></dd>
+                  <small>{m.conversionPct.toLocaleString('es-AR')} % de aceptación</small>
+                </div>
+                <div className="kpi pendiente">
+                  <dt>Pendiente</dt>
+                  <dd><Importe valor={m.pendiente} moneda={m.moneda} /></dd>
+                  <small>Esperando respuesta</small>
+                </div>
+                <div className="kpi ganancia">
+                  <dt>Ganancia</dt>
+                  <dd><Importe valor={m.ganancia} moneda={m.moneda} /></dd>
+                  <small>De lo aceptado</small>
+                </div>
+              </dl>
+            ))}
             <div className="resumen-mes">
               {resumenMes.map((m) => (
                 <GraficoCircular
@@ -162,7 +191,7 @@ export function Inicio() {
                       <Iniciales nombre={cliente} />
                       <span className="ultimos-cliente">
                         <strong>{cliente}</strong>
-                        <small>N° {String(p.numero).padStart(4, '0')} · {p.estado === 'borrador' ? 'editado' : 'emitido'} {haceCuanto(p.estado === 'borrador' ? (p.updated || p.created) : (p.fechaEmision || p.created))}{tienePermiso(usuario, 'quotes.view_all') && p.vendedorNombre ? ` · ${p.vendedorNombre}` : ''}</small>
+                        <small>N° {String(p.numero).padStart(4, '0')} · {p.estado === 'borrador' ? 'editado ' : ''}{haceCuanto(p.estado === 'borrador' ? (p.updated || p.created) : (p.fechaEmision || p.created))}{variosVendedores && p.vendedorNombre ? ` · ${p.vendedorNombre}` : ''}</small>
                       </span>
                       <span className="ultimos-total"><Importe valor={p.total} moneda={p.moneda} /></span>
                       <span className={`estado-punto ${caducado ? 'caducado' : p.estado}`}>{caducado ? 'Caducado' : ETIQUETA[p.estado]}</span>

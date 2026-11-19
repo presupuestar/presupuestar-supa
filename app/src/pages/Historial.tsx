@@ -36,6 +36,8 @@ const AVISO_ESTADO: Record<Estado, string> = {
   rechazado: 'Marcado como rechazado.',
 }
 
+/** Mes corto para las barras: «nov 2026». */
+const mesCorto = (aaaamm: string) => new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }).replace('.', '').replace(' de ', ' ')
 const nombreMes = (aaaamm: string) => {
   const t = new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
   return t.charAt(0).toUpperCase() + t.slice(1)
@@ -127,7 +129,7 @@ export function Historial() {
       .slice(-12)
       .map((fila) => ({
         clave: fila.mes,
-        etiqueta: nombreMes(fila.mes),
+        etiqueta: mesCorto(fila.mes),
         valor: fila.presupuestado,
         valorTexto: importeEnMoneda(fila.presupuestado, fila.moneda),
         color: `mes-${Number(fila.mes.slice(5, 7))}` as ColorSegmento,
@@ -299,7 +301,7 @@ export function Historial() {
           </EstadoVacio>
         ) : (
         <div className="tabla-caja historial-caja">
-          <table className="tabla tabla-historial">
+          <table className={`tabla tabla-historial${esAdmin && vendedores.length > 1 ? ' con-vendedores' : ''}`}>
             <thead><tr><th>Cliente</th><th>N°</th><th>Fecha</th><th>Vendedor</th><th className="num">Total</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
             <tbody>
               {lista === null && <CargandoFilas columnas={cols} />}
