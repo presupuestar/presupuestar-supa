@@ -227,7 +227,7 @@ export function Inicio() {
                   key={m.moneda}
                   titulo={`Estado de presupuestos · ${normalizarMoneda(m.moneda)}`}
                   total={importeEnMoneda(m.presupuestado, m.moneda)}
-                  sinTotales
+                  detalle={usuario?.verGanancias ? { etiqueta: 'Ganancia de aceptados', importe: importeEnMoneda(m.ganancia, m.moneda) } : undefined}
                   segmentos={[
                     { etiqueta: 'Aceptado', valor: m.aceptado, importe: importeEnMoneda(m.aceptado, m.moneda), color: 'aceptado' },
                     { etiqueta: 'Pendiente', valor: m.pendiente, importe: importeEnMoneda(m.pendiente, m.moneda), color: 'pendiente' },

@@ -20,13 +20,11 @@ function puntoEnCirculo(grados: number, radio: number) {
   return { x: 100 + radio * Math.cos(radianes), y: 100 + radio * Math.sin(radianes) }
 }
 
-export function GraficoCircular({ titulo, segmentos, total, detalle, sinTotales }: {
+export function GraficoCircular({ titulo, segmentos, total, detalle }: {
   titulo: string
   segmentos: SegmentoCircular[]
   total: string
   detalle?: { etiqueta: string; importe: string }
-  /** Cuando las cifras ya están arriba en grande (Inicio), el gráfico no las repite. */
-  sinTotales?: boolean
 }) {
   const suma = segmentos.reduce((acumulado, segmento) => acumulado + Math.max(0, segmento.valor), 0)
   let grados = 0
@@ -57,7 +55,7 @@ export function GraficoCircular({ titulo, segmentos, total, detalle, sinTotales 
     <section className="grafico-circular">
       <header className="grafico-circular-encabezado">
         <h3>{titulo}</h3>
-        {!sinTotales && <p><span>Total presupuestado</span><strong>{total}</strong></p>}
+        <p><span>Total presupuestado</span><strong>{total}</strong></p>
       </header>
       <div className="grafico-circular-contenido">
         <svg
