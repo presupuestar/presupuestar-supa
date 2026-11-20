@@ -2,7 +2,7 @@ import { Document, Page, View, Text, Image, Svg, Path, Rect, G, StyleSheet } fro
 import { fechaCorta, importeEnMoneda } from '../formato'
 import { fechaVigencia, presupuestoCaducado } from '../estados'
 import { LEYENDA_FISCAL } from '../legal'
-import { requiereSena } from '../pagos'
+import { partesSena, requiereSena } from '../pagos'
 import type { Empresa, Presupuesto } from '../tipos'
 
 export interface LogoPng { src: string; ancho: number; alto: number }
@@ -179,22 +179,23 @@ export function PresupuestoPdf({ presupuesto: p, empresa: e, logo, fuentes }: Pr
               <Text style={s.totalVal}>{importeEnMoneda(p.total, p.moneda)}</Text>
             </View>
             {requiereSena(p.formaPago) && (() => {
-              const sena = Math.round(p.total * 50) / 100
-              const saldo = Math.round((p.total - sena) * 100) / 100
+              const { porcentaje, sena, saldo } = partesSena(p.total, p.formaPago)
+              const pct = porcentaje.toLocaleString('es-AR')
+              const resto = (100 - porcentaje).toLocaleString('es-AR')
               return (
                 <View style={s.senaCaja}>
                   <Text style={s.senaTit}>Forma de pago en dos partes</Text>
                   <View style={s.senaFila}>
                     <View>
-                      <Text style={s.senaEt}>Seña al aceptar</Text>
-                      <Text style={s.senaNota}>50% del total</Text>
+                      <Text style={s.senaEt}>Seña</Text>
+                      <Text style={s.senaNota}>{pct}% del total</Text>
                     </View>
                     <Text style={s.senaVal}>{importeEnMoneda(sena, p.moneda)}</Text>
                   </View>
                   <View style={{ ...s.senaFila, ...s.senaSaldo }}>
                     <View>
-                      <Text style={s.senaEt}>Saldo a la entrega</Text>
-                      <Text style={s.senaNota}>50% restante</Text>
+                      <Text style={s.senaEt}>Saldo</Text>
+                      <Text style={s.senaNota}>{resto}% restante</Text>
                     </View>
                     <Text style={s.senaValSec}>{importeEnMoneda(saldo, p.moneda)}</Text>
                   </View>

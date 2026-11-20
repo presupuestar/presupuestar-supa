@@ -6,7 +6,7 @@ import { repositorio } from '../lib/repositorio'
 import { fechaCorta, formatearImporte, importeEnMoneda, normalizarMoneda, parseCantidad, parseImporte } from '../lib/formato'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
 import { FORMAS_PAGO, OTRA_FORMA } from '../lib/pagos'
-import { requiereSena } from '../lib/pagos'
+import { partesSena, requiereSena } from '../lib/pagos'
 import { mensajeError } from '../lib/errores'
 import { ETIQUETA, fechaVigencia, presupuestoCaducado, sePuedeEditar } from '../lib/estados'
 import { convertirUsdAArs, obtenerCotizacionBlue } from '../lib/cotizacion'
@@ -131,6 +131,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   // cartera: el vínculo se conserva, pero esa ficha ya no se puede actualizar.
   const clienteEliminado = Boolean(clienteSel) && clientesCargados && !clientes.some((c) => c.id === clienteSel)
   const total = useMemo(() => Math.round(lineas.reduce((s, l) => s + importe(l), 0) * 100) / 100, [lineas])
+  const formaElegida = pagoOpcion === OTRA_FORMA ? pagoOtra : pagoOpcion
   const monedaPresupuesto = normalizarMoneda(lineas[0]?.moneda ?? inicial?.moneda)
   const proveedoresCatalogo = useMemo(
     () => [...new Set(catalogo.map((i) => i.proveedor?.trim()).filter((p): p is string => Boolean(p)))].sort((a, b) => a.localeCompare(b)),
@@ -520,7 +521,10 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
         <div className="total-num">
           <span>Total ({monedaPresupuesto})</span>
           <strong>{importeEnMoneda(total, monedaPresupuesto)}</strong>
-          {requiereSena(pagoOpcion === OTRA_FORMA ? pagoOtra : pagoOpcion) && <small className="sena-resumen">Seña al aceptar (50%): <b>{importeEnMoneda(Math.round(total * 50) / 100, monedaPresupuesto)}</b> · Saldo a la entrega: <b>{importeEnMoneda(Math.round((total - Math.round(total * 50) / 100) * 100) / 100, monedaPresupuesto)}</b></small>}
+          {requiereSena(formaElegida) && (() => {
+            const { porcentaje, sena, saldo } = partesSena(total, formaElegida)
+            return <small className="sena-resumen">Seña ({porcentaje.toLocaleString('es-AR')}%): <b>{importeEnMoneda(sena, monedaPresupuesto)}</b> · Saldo: <b>{importeEnMoneda(saldo, monedaPresupuesto)}</b></small>
+          })()}
         </div>
         <div className={`botones${conservaEstado ? ' una-accion' : ''}`}>
           {error && <p className="error" role="alert">{error}</p>}

@@ -1,4 +1,4 @@
-import { requiereSena } from './pagos'
+import { partesSena, requiereSena } from './pagos'
 import type { Cobro, Presupuesto } from './tipos'
 
 /**
@@ -23,8 +23,10 @@ export function etiquetaCobro(p: Presupuesto, cobro: Cobro = cobroDe(p)): string
 }
 
 const redondear = (n: number) => Math.round(n * 100) / 100
-/** Importe de la seña (la mitad del total). */
-export const importeSena = (p: Presupuesto) => redondear(p.total / 2)
+/** Importe de la seña: el porcentaje que dice la forma de pago (50 % si no dice cuánto). */
+export const importeSena = (p: Presupuesto) => partesSena(p.total, p.formaPago).sena
+/** Porcentaje de la seña, para mostrarlo. */
+export const porcentajeDeSena = (p: Presupuesto) => partesSena(p.total, p.formaPago).porcentaje
 
 /** Lo que el cliente todavía debe. */
 export function saldoPendiente(p: Presupuesto): number {

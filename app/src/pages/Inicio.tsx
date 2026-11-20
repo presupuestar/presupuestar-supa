@@ -15,7 +15,7 @@ import { Importe } from '../components/Importe'
 import { Iniciales } from '../components/Iniciales'
 import { haceCuanto } from '../lib/tiempo'
 import { useAvisos } from '../components/Avisos'
-import { AVISO_COBRO, cobroDe, proximoCobro, saldoPendiente, siguienteCobro, sigueCobro } from '../lib/cobros'
+import { AVISO_COBRO, cobroDe, porcentajeDeSena, proximoCobro, saldoPendiente, siguienteCobro, sigueCobro } from '../lib/cobros'
 
 /** Mes corto para las barras: «nov 2026». */
 const mesCorto = (aaaamm: string) => new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }).replace('.', '').replace(' de ', ' ')
@@ -151,7 +151,7 @@ export function Inicio() {
                     </span>
                     <span className="por-cobrar-importe">
                       <Importe valor={proximoCobro(p)} moneda={p.moneda} />
-                      <small className={`cobro-etiqueta ${cobroDe(p)}`}>{esSena ? 'Seña del 50 %' : cobroDe(p) === 'sena' ? 'Saldo · seña cobrada' : 'Total'}</small>
+                      <small className={`cobro-etiqueta ${cobroDe(p)}`}>{esSena ? `Seña del ${porcentajeDeSena(p).toLocaleString('es-AR')} %` : cobroDe(p) === 'sena' ? 'Saldo · seña cobrada' : 'Total'}</small>
                     </span>
                     {puedeCobrar(p) && siguiente && (
                       <button type="button" className="btn sec chico" disabled={cobrando === p.id} onClick={() => void avanzarCobro(p)}>
