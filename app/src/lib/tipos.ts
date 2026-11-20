@@ -70,6 +70,8 @@ export interface Linea {
 
 export type ClienteDatos = Omit<Cliente, 'id' | 'empresa'>
 
+export type Cobro = 'por_cobrar' | 'sena' | 'cobrado'
+
 export interface Presupuesto {
   id: string
   empresa: string
@@ -97,6 +99,8 @@ export interface Presupuesto {
   /** Último día inclusive de vigencia comercial. */
   vigenteHasta?: string
   fechaRespuesta?: string
+  /** Cobro de un presupuesto aceptado (vacío = por cobrar). */
+  cobro?: Cobro
   created: string
   updated: string
 }

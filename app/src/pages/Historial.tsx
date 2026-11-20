@@ -11,7 +11,8 @@ import { fechaCorta, importeEnMoneda, normalizarMoneda } from '../lib/formato'
 import { mensajeError } from '../lib/errores'
 import { ETIQUETA, fechaVigencia, opcionesEstado, presupuestoCaducado, sePuedeEditar } from '../lib/estados'
 import { generarPdf, nombreArchivo } from '../lib/pdf/generar'
-import type { Estado, Presupuesto } from '../lib/tipos'
+import type { Cobro, Estado, Presupuesto } from '../lib/tipos'
+import { AVISO_COBRO, cobroDe, etiquetaCobro, pasosCobro, saldoPendiente, sigueCobro } from '../lib/cobros'
 import { Iniciales, colorPersona } from '../components/Iniciales'
 import { Importe } from '../components/Importe'
 import { cuandoVence, haceCuanto } from '../lib/tiempo'
@@ -74,8 +75,9 @@ export function Historial() {
   const [busqueda, setBusqueda] = useState('')
   // Desde el aviso de Inicio se llega con ?estado=caducado: se muestran los caducados de cualquier mes.
   const [parametros] = useSearchParams()
-  const desdeAviso = parametros.get('estado') === 'caducado'
-  const [estado, setEstado] = useState<'todos' | Estado | 'caducado'>(desdeAviso ? 'caducado' : 'todos')
+  const filtroInicial = parametros.get('estado')
+  const desdeAviso = filtroInicial === 'caducado' || filtroInicial === 'por_cobrar'
+  const [estado, setEstado] = useState<'todos' | Estado | 'caducado' | 'por_cobrar'>(desdeAviso ? filtroInicial as 'caducado' | 'por_cobrar' : 'todos')
   const [mes, setMes] = useState<string | null>(() => {
     if (desdeAviso) return null
     const ahora = new Date()
@@ -163,7 +165,9 @@ export function Historial() {
     const q = busqueda.trim().toLowerCase()
     return (lista ?? []).filter((p) => {
       const caducado = presupuestoCaducado(p, empresa?.validezDias, ahora)
-      if (estado === 'caducado' ? !caducado : estado !== 'todos' && p.estado !== estado) return false
+      if (estado === 'caducado' ? !caducado
+        : estado === 'por_cobrar' ? !(sigueCobro(p) && saldoPendiente(p) > 0)
+        : estado !== 'todos' && p.estado !== estado) return false
       if (mes && mesDe(p) !== mes) return false
       if (vendedor !== 'todos' && (p.vendedorEmail || '') !== vendedor) return false
       if (!q) return true
@@ -190,6 +194,12 @@ export function Historial() {
       setError(p.estado === 'borrador' ? `${base} Abrí el borrador con "Editar" para completar los datos y emitirlo.` : base)
       await cargar()
     }
+  }
+
+  const cambiarCobro = async (p: Presupuesto, cobro: Cobro) => {
+    setError('')
+    try { await repositorio.presupuestos.cambiarCobro(p.id, cobro); avisar(AVISO_COBRO[cobro]); await cargar() }
+    catch (e) { setError(mensajeError(e, 'No se pudo registrar el cobro.')); await cargar() }
   }
 
   const eliminar = async (p: Presupuesto) => {
@@ -284,9 +294,10 @@ export function Historial() {
 
         <div className="filtros">
           <input type="search" placeholder="Buscar cliente o número…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar presupuesto" />
-          <select value={estado} onChange={(e) => setEstado(e.target.value as 'todos' | Estado)} aria-label="Filtrar por estado" className="filtro-estado">
+          <select value={estado} onChange={(e) => setEstado(e.target.value as typeof estado)} aria-label="Filtrar por estado" className="filtro-estado">
             <option value="todos">Todos los estados</option>
             <option value="caducado">Caducados</option>
+            <option value="por_cobrar">Por cobrar</option>
             {(Object.keys(ETIQUETA) as Estado[]).map((e) => <option key={e} value={e}>{ETIQUETA[e]}</option>)}
           </select>
           {esAdmin && vendedores.length > 0 && (
@@ -336,6 +347,13 @@ export function Historial() {
                       {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
                     </select>}
                     {!presupuestoCaducado(p, empresa?.validezDias, ahora) && situacion(p, empresa?.validezDias, ahora) && <small className="situacion">{situacion(p, empresa?.validezDias, ahora)}</small>}
+                    {sigueCobro(p) && (puedeModificar(p)
+                      ? <select className={`cobro-sel ${cobroDe(p)}`} value={cobroDe(p)} aria-label={`Cobro del presupuesto ${p.numero}`}
+                          onChange={(e) => cambiarCobro(p, e.target.value as Cobro)}>
+                          {pasosCobro(p).map((c) => <option key={c} value={c}>{etiquetaCobro(p, c)}</option>)}
+                        </select>
+                      : <span className={`cobro-sel cobro-fijo ${cobroDe(p)}`}>{etiquetaCobro(p)}</span>)}
+                    {sigueCobro(p) && cobroDe(p) === 'sena' && <small className="situacion">Falta {importeEnMoneda(saldoPendiente(p), p.moneda)}</small>}
                   </td>
                   <td className="campo-acciones">
                     <div className="acciones-historial">

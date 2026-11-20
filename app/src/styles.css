@@ -1241,7 +1241,7 @@ body{background:
   background-attachment:fixed}
 
 /* Material base */
-.panel,.tabla-caja,.grafico-circular,.grafico-barras,.ultimos-lista,.inicio-vacio,.listo,
+.panel,.tabla-caja,.grafico-circular,.grafico-barras,.ultimos-lista,.por-cobrar-lista,.inicio-vacio,.listo,
 .barra-seleccion-catalogo,.seccion-proveedor>.catalogo-desplegable-resumen,.tarjetas article,
 .lista-roles>li,.selector-archivo-caja,.resultados-agregar-item,.catalogo-menu-fila>div{
   background:var(--vidrio);
@@ -1249,7 +1249,7 @@ body{background:
   box-shadow:var(--vidrio-brillo),0 0 0 1px var(--vidrio-contorno),var(--vidrio-sombra);
   -webkit-backdrop-filter:var(--vidrio-desenfoque);backdrop-filter:var(--vidrio-desenfoque);
 }
-.panel,.grafico-circular,.grafico-barras,.ultimos-lista,.inicio-vacio,.listo{border-radius:var(--radio-vidrio)}
+.panel,.grafico-circular,.grafico-barras,.ultimos-lista,.por-cobrar-lista,.inicio-vacio,.listo{border-radius:var(--radio-vidrio)}
 .tabla-caja{border-radius:20px}
 @media (min-width:821px){.tabla-caja .tabla tbody tr{background:transparent}}
 .resultados-agregar-item,.catalogo-menu-fila>div{background:var(--vidrio-fuerte)}
@@ -1641,4 +1641,47 @@ dialog::backdrop{background:rgba(16,24,40,.28);-webkit-backdrop-filter:blur(6px)
   .tabla td.acciones{display:table-cell;text-align:right;white-space:nowrap}
   .tabla td.acciones>*{display:inline-block;vertical-align:middle}
   .tabla td.acciones>*+*{margin-left:16px}
+}
+
+/* ── Cobro de presupuestos aceptados ─────────────────────────────────────────
+   Un solo dato con pasos en orden (por cobrar → seña → cobrado), en colores que no
+   se confunden con los del estado: ámbar = falta todo, azul = falta el saldo, verde = listo. */
+:root{--cobro-pend-bg:#FDF1D6;--cobro-pend-fg:#7A5300;--cobro-sena-bg:#E3EDFB;--cobro-sena-fg:#1D4E89;--cobro-ok-bg:#DDF4EA;--cobro-ok-fg:#12643F}
+:root[data-tema=oscuro]{--cobro-pend-bg:#33280F;--cobro-pend-fg:#F2C14E;--cobro-sena-bg:#132841;--cobro-sena-fg:#8DBDF5;--cobro-ok-bg:#10291F;--cobro-ok-fg:#86E8B5}
+@media (prefers-color-scheme:dark){:root:not([data-tema=claro]){--cobro-pend-bg:#33280F;--cobro-pend-fg:#F2C14E;--cobro-sena-bg:#132841;--cobro-sena-fg:#8DBDF5;--cobro-ok-bg:#10291F;--cobro-ok-fg:#86E8B5}}
+
+.cobro-sel{display:block;width:max-content;max-width:100%;margin-top:6px;padding:4px 10px;border:1px solid transparent;border-radius:999px;font:600 12px var(--fuente-texto);cursor:pointer}
+.cobro-fijo{cursor:default}
+.cobro-sel.por_cobrar{background:var(--cobro-pend-bg);color:var(--cobro-pend-fg)}
+.cobro-sel.sena{background:var(--cobro-sena-bg);color:var(--cobro-sena-fg)}
+.cobro-sel.cobrado{background:var(--cobro-ok-bg);color:var(--cobro-ok-fg)}
+.cobro-sel option{background:var(--superficie);color:var(--tinta)}
+
+/* Inicio: lo que falta cobrar, arriba de todo para que no se olvide. */
+.por-cobrar{margin:4px 0 28px}
+.por-cobrar>.encabezado{margin-bottom:12px;align-items:flex-end}
+.por-cobrar h2{font-size:19px;margin:0}
+.por-cobrar-total{margin:4px 0 0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font:700 clamp(22px,2vw,28px)/1.15 var(--fuente-titulos);color:var(--tinta)}
+.por-cobrar-total .importe-moneda,.por-cobrar-total .importe-centavos{font-size:.55em;color:var(--muted)}
+.por-cobrar-total small{font:500 13px var(--fuente-texto);color:var(--muted)}
+.por-cobrar-lista{list-style:none;margin:0;padding:0;background:var(--superficie);border:1px solid var(--linea);box-shadow:var(--sombra-caja);overflow:hidden}
+.por-cobrar-lista li{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:16px;padding:13px 18px}
+.por-cobrar-lista li+li{border-top:1px solid var(--linea)}
+.por-cobrar-cliente{display:grid;min-width:0}
+.por-cobrar-cliente strong{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.por-cobrar-cliente small{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.por-cobrar-importe{display:grid;justify-items:end;gap:3px;font-size:18px;font-weight:700;color:var(--tinta);white-space:nowrap}
+.por-cobrar-importe .importe-moneda{font-size:11.5px;color:var(--muted)}
+.cobro-etiqueta{padding:2px 8px;border-radius:999px;font:600 11.5px var(--fuente-texto)}
+.cobro-etiqueta.por_cobrar{background:var(--cobro-pend-bg);color:var(--cobro-pend-fg)}
+.cobro-etiqueta.sena{background:var(--cobro-sena-bg);color:var(--cobro-sena-fg)}
+.por-cobrar-lista .btn{white-space:nowrap}
+@media (max-width:640px){
+  .por-cobrar-lista li{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"ini cli imp" "btn btn btn";row-gap:10px;padding:12px 14px}
+  .por-cobrar-lista li>.iniciales{grid-area:ini}
+  .por-cobrar-cliente{grid-area:cli}
+  .por-cobrar-cliente strong,.por-cobrar-cliente small{white-space:normal;overflow-wrap:normal;line-height:1.35}
+  .por-cobrar-cliente strong{font-size:15px}
+  .por-cobrar-importe{grid-area:imp;font-size:16px}
+  .por-cobrar-lista .btn{grid-area:btn;width:100%}
 }

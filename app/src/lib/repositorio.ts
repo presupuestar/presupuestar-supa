@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { normalizarMoneda } from './formato'
 import { errorDeFuncion } from './errores'
-import { PERMISOS_EMPRESA, type Cliente, type Empresa, type Estado, type Item, type Linea, type PermisoEmpresa, type Presupuesto, type ResumenMes, type ResumenVendedor, type RolEmpresa, type UsuarioEquipo } from './tipos'
+import { PERMISOS_EMPRESA, type Cliente, type Cobro, type Empresa, type Estado, type Item, type Linea, type PermisoEmpresa, type Presupuesto, type ResumenMes, type ResumenVendedor, type RolEmpresa, type UsuarioEquipo } from './tipos'
 
 type DbRow = Record<string, unknown>
 
@@ -88,6 +88,7 @@ const presupuestoDesdeDb = (r: DbRow): Presupuesto => ({
   cotizacionFuente: String(r.exchange_rate_source ?? ''),
   vigenteHasta: String(r.valid_until_date ?? ''),
   fechaRespuesta: String(r.answered_at ?? ''),
+  cobro: (r.payment_status as Cobro | null) ?? undefined,
   created: String(r.created_at ?? ''),
   updated: String(r.updated_at ?? ''),
 })
@@ -339,7 +340,8 @@ export const repositorio = {
         .update(clienteAColumna(d)).eq('id', id).select('*').single()))
     },
     async eliminar(id: string) {
-      const { error } = await supabase.from('clients').update({ deleted_at: new Date().toISOString() }).eq('id', id).is('deleted_at', null)
+      // Supresión lógica en el servidor (ver migración 20261120140000_eliminar_cliente.sql).
+      const { error } = await supabase.rpc('delete_client', { p_client_id: id })
       if (error) throw error
     },
     /** Copia descargable de la cartera y de los presupuestos de la empresa (Ley 25.326). */
@@ -374,6 +376,10 @@ export const repositorio = {
     async cambiarEstado(id: string, estado: Estado) {
       return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
         .update({ status: estado }).eq('id', id).select('*').single()))
+    },
+    async cambiarCobro(id: string, cobro: Cobro) {
+      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
+        .update({ payment_status: cobro }).eq('id', id).select('*').single()))
     },
     async eliminar(id: string) {
       const { data, error } = await supabase.from('quotes').delete().eq('id', id).select('id').maybeSingle()

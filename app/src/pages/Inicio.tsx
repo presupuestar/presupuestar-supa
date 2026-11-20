@@ -14,6 +14,8 @@ import { ETIQUETA, sePuedeEditar } from '../lib/estados'
 import { Importe } from '../components/Importe'
 import { Iniciales } from '../components/Iniciales'
 import { haceCuanto } from '../lib/tiempo'
+import { useAvisos } from '../components/Avisos'
+import { AVISO_COBRO, cobroDe, proximoCobro, saldoPendiente, siguienteCobro, sigueCobro } from '../lib/cobros'
 
 /** Mes corto para las barras: «nov 2026». */
 const mesCorto = (aaaamm: string) => new Date(aaaamm + '-15').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }).replace('.', '').replace(' de ', ' ')
@@ -36,24 +38,47 @@ export function Inicio() {
   const [borradores, setBorradores] = useState(0)
   const [esperando, setEsperando] = useState(0)
   const [ultimos, setUltimos] = useState<Presupuesto[]>([])
+  const [porCobrar, setPorCobrar] = useState<Presupuesto[]>([])
+  const [cobrando, setCobrando] = useState<string | null>(null)
+  const { avisar } = useAvisos()
   const [cargado, setCargado] = useState(false)
   const [error, setError] = useState('')
   const puedeVer = tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')
 
-  useEffect(() => {
+  const cargar = () => {
     if (tienePermiso(usuario, 'quotes.view_own') || tienePermiso(usuario, 'quotes.view_all')) {
-      repositorio.presupuestos.listar()
+      return repositorio.presupuestos.listar()
         .then((l) => {
           setMeses(repositorio.resumenMensual(l))
           setCaducados(l.filter((p) => presupuestoCaducado(p, empresa?.validezDias)).length)
           setBorradores(l.filter((p) => p.estado === 'borrador').length)
           setUltimos([...l].sort((a, b) => (b.updated || b.created).localeCompare(a.updated || a.created)).slice(0, 5))
           setEsperando(l.filter((p) => p.estado === 'pendiente' && !presupuestoCaducado(p, empresa?.validezDias)).length)
+          // Lo aceptado que todavía no se cobró: primero lo que se aceptó hace más tiempo.
+          setPorCobrar(l.filter((p) => sigueCobro(p) && saldoPendiente(p) > 0)
+            .sort((a, b) => (a.fechaRespuesta || a.updated).localeCompare(b.fechaRespuesta || b.updated)))
           setCargado(true)
         })
         .catch((e) => setError(mensajeError(e, 'No se pudo cargar el resumen de presupuestos.')))
     }
-  }, [usuario, empresa?.validezDias])
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void cargar() }, [usuario, empresa?.validezDias])
+
+  const puedeCobrar = (p: Presupuesto) =>
+    tienePermiso(usuario, 'quotes.update_own') && (usuario?.rol === 'admin' || p.vendedor === usuario?.id)
+  const avanzarCobro = async (p: Presupuesto) => {
+    const siguiente = siguienteCobro(p)
+    if (!siguiente) return
+    setCobrando(p.id); setError('')
+    try { await repositorio.presupuestos.cambiarCobro(p.id, siguiente); avisar(AVISO_COBRO[siguiente]); await cargar() }
+    catch (e) { setError(mensajeError(e, 'No se pudo registrar el cobro.')) }
+    finally { setCobrando(null) }
+  }
+  const totalPorCobrar = [...porCobrar.reduce((m, p) => {
+    const moneda = normalizarMoneda(p.moneda)
+    return m.set(moneda, (m.get(moneda) ?? 0) + saldoPendiente(p))
+  }, new Map<string, number>())]
 
   const mes = meses[0]
   // El vendedor solo aporta si hay más de uno.
@@ -98,6 +123,46 @@ export function Inicio() {
             {caducados === 1 ? 'Hay 1 presupuesto pendiente que superó su fecha de vigencia.' : `Hay ${caducados} presupuestos pendientes que superaron su fecha de vigencia.`}
             {' '}<Link className="link" to="/historial?estado=caducado">{caducados === 1 ? 'Revisarlo en el historial' : 'Revisarlos en el historial'}</Link>
           </p>
+        )}
+
+        {cargado && porCobrar.length > 0 && (
+          <section className="por-cobrar" aria-labelledby="titulo-por-cobrar">
+            <div className="encabezado">
+              <div>
+                <h2 id="titulo-por-cobrar">Por cobrar</h2>
+                <p className="por-cobrar-total">
+                  {totalPorCobrar.map(([moneda, total], i) => <span key={moneda}>{i > 0 && ' + '}<Importe valor={total} moneda={moneda} /></span>)}
+                  <small>{porCobrar.length === 1 ? '1 presupuesto aceptado' : `${porCobrar.length} presupuestos aceptados`}</small>
+                </p>
+              </div>
+              {porCobrar.length > 4 && <Link className="link" to="/historial?estado=por_cobrar">Ver todos</Link>}
+            </div>
+            <ul className="por-cobrar-lista">
+              {porCobrar.slice(0, 4).map((p) => {
+                const cliente = p.clienteDatos?.nombre || 'Sin cliente'
+                const siguiente = siguienteCobro(p)
+                const esSena = cobroDe(p) === 'por_cobrar' && siguiente === 'sena'
+                return (
+                  <li key={p.id}>
+                    <Iniciales nombre={cliente} />
+                    <span className="por-cobrar-cliente">
+                      <strong>{cliente}</strong>
+                      <small>N° {String(p.numero).padStart(4, '0')}{p.fechaRespuesta ? ` · aceptado ${haceCuanto(p.fechaRespuesta)}` : ''}</small>
+                    </span>
+                    <span className="por-cobrar-importe">
+                      <Importe valor={proximoCobro(p)} moneda={p.moneda} />
+                      <small className={`cobro-etiqueta ${cobroDe(p)}`}>{esSena ? 'Seña del 50 %' : cobroDe(p) === 'sena' ? 'Saldo · seña cobrada' : 'Total'}</small>
+                    </span>
+                    {puedeCobrar(p) && siguiente && (
+                      <button type="button" className="btn sec chico" disabled={cobrando === p.id} onClick={() => void avanzarCobro(p)}>
+                        {cobrando === p.id ? 'Guardando…' : siguiente === 'sena' ? 'Cobré la seña' : 'Marcar cobrado'}
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
         )}
 
         {!cargado && puedeVer && !error && (
