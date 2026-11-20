@@ -198,7 +198,7 @@ export function Inicio() {
             <div className="encabezado"><h2>Panorama de {nombreMes(mes.mes)}</h2><Link className="link" to="/historial">Ver historial</Link></div>
             {/* Las cifras que importan, primero y en grande; los gráficos las explican debajo. */}
             {resumenMes.map((m) => (
-              <dl className="kpis" key={`kpis-${m.moneda}`} aria-label={`Resumen del mes en ${normalizarMoneda(m.moneda)}`}>
+              <dl className={`kpis${usuario?.verGanancias ? '' : ' sin-ganancia'}`} key={`kpis-${m.moneda}`} aria-label={`Resumen del mes en ${normalizarMoneda(m.moneda)}`}>
                 <div className="kpi principal">
                   <dt>Presupuestado</dt>
                   <dd><Importe valor={m.presupuestado} moneda={m.moneda} /></dd>
@@ -214,11 +214,11 @@ export function Inicio() {
                   <dd><Importe valor={m.pendiente} moneda={m.moneda} /></dd>
                   <small>Esperando respuesta</small>
                 </div>
-                <div className="kpi ganancia">
+                {usuario?.verGanancias && <div className="kpi ganancia">
                   <dt>Ganancia</dt>
                   <dd><Importe valor={m.ganancia} moneda={m.moneda} /></dd>
                   <small>De lo aceptado</small>
-                </div>
+                </div>}
               </dl>
             ))}
             <div className="resumen-mes">

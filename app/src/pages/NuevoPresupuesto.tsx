@@ -62,6 +62,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
   // Guardar o actualizar la ficha del cliente y sumar ítems al catálogo necesitan sus permisos.
   const puedeGuardarClientes = tienePermiso(usuario, 'clients.manage')
   const puedeGuardarCatalogo = tienePermiso(usuario, 'catalog.manage')
+  const verGanancias = Boolean(usuario?.verGanancias)
   const [catalogo, setCatalogo] = useState<Item[]>([])
   const [busquedaItem, setBusquedaItem] = useState('')
   const [itemUsdPendiente, setItemUsdPendiente] = useState<Item | null>(null)
@@ -265,7 +266,7 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     if (lineas.some((l) => !lineaValida(l))) return 'Revisá los ítems: cada uno necesita descripción, una cantidad mayor a 0 y un importe de 0 o más.'
     if (new Set(lineas.map((l) => normalizarMoneda(l.moneda))).size > 1) return 'Un presupuesto no puede mezclar precios de distintas monedas.'
     const gananciaIngresada = ganancia.trim() ? parseImporte(ganancia) : 0
-    if (!Number.isFinite(gananciaIngresada) || gananciaIngresada < 0) return 'La ganancia tiene que ser un importe igual o mayor a 0.'
+    if (verGanancias && (!Number.isFinite(gananciaIngresada) || gananciaIngresada < 0)) return 'La ganancia tiene que ser un importe igual o mayor a 0.'
     if (!nombre.trim()) return 'Falta el nombre completo del cliente.'
     if (email.trim() && !EMAIL.test(email.trim())) return 'El correo electrónico no tiene un formato válido.'
     return ''
@@ -311,7 +312,8 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
         plazo: plazo.trim(),
         formaPago: pagoOpcion === OTRA_FORMA ? pagoOtra.trim() : pagoOpcion,
         notas: notas.trim(),
-        ganancia: ganancia.trim() ? parseImporte(ganancia) : 0,
+        // Quien no ve las ganancias no las envía: así no pisa la que cargó el administrador.
+        ...(verGanancias ? { ganancia: ganancia.trim() ? parseImporte(ganancia) : 0 } : {}),
         moneda: monedaPresupuesto,
         cotizacionDolar: tasa,
         cotizacionFecha: fechaCotizacion,
@@ -508,10 +510,10 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
         <label className="campo">Notas <small>(opcional)</small>
           <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} maxLength={2000} />
         </label>
-        <label className="campo">Ganancia estimada ({monedaPresupuesto}) <small>(solo visible en el panel interno; no se incluye en el PDF)</small>
+        {verGanancias && <label className="campo">Ganancia estimada ({monedaPresupuesto}) <small>(solo visible en el panel interno; no se incluye en el PDF)</small>
           <input inputMode="decimal" value={ganancia} onChange={(e) => setGanancia(e.target.value)}
             onBlur={() => { const n = parseImporte(ganancia); if (Number.isFinite(n) && n >= 0) setGanancia(formatearImporte(n)) }} />
-        </label>
+        </label>}
       </section>
 
       <div className="barra-total">

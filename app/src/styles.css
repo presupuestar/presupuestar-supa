@@ -1685,3 +1685,14 @@ dialog::backdrop{background:rgba(16,24,40,.28);-webkit-backdrop-filter:blur(6px)
   .por-cobrar-importe{grid-area:imp;font-size:16px}
   .por-cobrar-lista .btn{grid-area:btn;width:100%}
 }
+
+/* Sin permiso para ver ganancias: tres cifras en lugar de cuatro. */
+.kpis.sin-ganancia{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1100px){.kpis.sin-ganancia{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis.sin-ganancia .kpi.principal{grid-column:1/-1}}
+
+/* Equipo: permiso de ganancias por empleado. */
+.ganancias-check{align-items:flex-start;gap:10px}
+.ganancias-check input{margin-top:3px}
+.ganancias-check span{display:grid;gap:2px;font-weight:600}
+.ganancias-check small{font-weight:400;font-size:12.5px;color:var(--muted)}
+.ganancias-fila{display:flex;margin-top:8px;font-size:13px;color:var(--muted);white-space:nowrap}

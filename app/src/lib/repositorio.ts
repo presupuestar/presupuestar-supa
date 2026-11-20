@@ -13,6 +13,32 @@ const errorResult = <T>(result: { data: T | null; error: { message: string; code
   return result.data
 }
 
+/**
+ * La ganancia estimada vive en quote_profits: la base solo la entrega a quien puede verla
+ * (administrador o empleado con «Puede ver las ganancias»). Si la migración todavía no
+ * está aplicada, se lee como antes, desde quotes.profit.
+ */
+let tablaGananciasDisponible = true
+type Respuesta<T> = { data: T | null; error: { message: string; code?: string } | null }
+async function conGanancia<T>(consulta: (columnas: string) => PromiseLike<Respuesta<T>>): Promise<Respuesta<T>> {
+  if (tablaGananciasDisponible) {
+    const r = await consulta('*, quote_profits(profit)')
+    if (!r.error || !(r.error.code === 'PGRST200' || /quote_profits/i.test(r.error.message))) return r
+    tablaGananciasDisponible = false
+  }
+  return consulta('*')
+}
+const gananciaDeFila = (r: DbRow) => {
+  const embebida = r.quote_profits as { profit?: unknown } | { profit?: unknown }[] | null | undefined
+  const fila = Array.isArray(embebida) ? embebida[0] : embebida
+  return Number(fila?.profit ?? r.profit) || 0
+}
+/** Guarda la ganancia del presupuesto. Nunca hace fallar el guardado del presupuesto en sí. */
+async function guardarGanancia(id: string, ganancia: number) {
+  const { error } = await supabase.rpc('set_quote_profit', { p_quote_id: id, p_profit: ganancia })
+  if (error && error.code !== 'PGRST202') console.warn('No se pudo guardar la ganancia:', error.message)
+}
+
 const empresaId = async (): Promise<string> => {
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
@@ -74,7 +100,7 @@ const presupuestoDesdeDb = (r: DbRow): Presupuesto => ({
   plazo: String(r.delivery_time ?? ''),
   formaPago: String(r.payment_terms ?? ''),
   notas: String(r.notes ?? ''),
-  ganancia: Number(r.profit) || 0,
+  ganancia: gananciaDeFila(r),
   cliente: String(r.client_id ?? ''),
   clienteDatos: r.client_snapshot as Presupuesto['clienteDatos'],
   lineas: r.lines as Linea[],
@@ -268,24 +294,38 @@ export const repositorio = {
 
   usuarios: {
     async listar(): Promise<UsuarioEquipo[]> {
-      const rows = errorResult(await supabase.from('profiles')
-        .select('user_id,company_id,role,name,first_access_password_answered,created_at,email')
-        .order('created_at'))
+      let resultado: Respuesta<DbRow[]> = await supabase.from('profiles')
+        .select('user_id,company_id,role,name,first_access_password_answered,created_at,email,can_view_profit')
+        .order('created_at')
+      if (resultado.error?.code === '42703') {
+        resultado = await supabase.from('profiles')
+          .select('user_id,company_id,role,name,first_access_password_answered,created_at,email')
+          .order('created_at')
+      }
+      const rows = errorResult(resultado) as DbRow[]
       return rows.map((r) => ({
         id: String(r.user_id),
         email: String(r.email ?? ''),
         name: String(r.name ?? ''),
         rol: String(r.role),
         primerAccesoClaveRespondido: Boolean(r.first_access_password_answered),
+        verGanancias: r.role === 'admin' || r.can_view_profit !== false,
         empresa: String(r.company_id ?? ''),
         created: String(r.created_at ?? ''),
       }))
     },
-    async crear(datos: { email: string; password: string; name: string; role?: string }) {
-      const { error } = await supabase.functions.invoke('manage-team', {
+    async crear({ verGanancias, ...datos }: { email: string; password: string; name: string; role?: string; verGanancias?: boolean }) {
+      const { data, error } = await supabase.functions.invoke('manage-team', {
         body: { action: 'create', ...datos },
       })
       if (error) throw await errorDeFuncion(error)
+      const id = (data as { id?: string } | null)?.id
+      if (id && verGanancias !== undefined) await this.cambiarVerGanancias(id, verGanancias)
+    },
+    /** Solo el administrador: si el empleado ve las ganancias de los presupuestos. */
+    async cambiarVerGanancias(id: string, puede: boolean) {
+      const { error } = await supabase.rpc('set_profit_access', { p_user_id: id, p_can_view: puede })
+      if (error) throw Object.assign(new Error(error.message), { code: error.code })
     },
     async cambiarRol(id: string, role: string) {
       const { error } = await supabase.functions.invoke('manage-team', {
@@ -358,20 +398,24 @@ export const repositorio = {
 
   presupuestos: {
     async listar() {
-      return errorResult(await filtrarPorAlcance(supabase.from('quotes').select('*')).order('number', { ascending: false })).map(presupuestoDesdeDb)
+      return errorResult(await conGanancia((columnas) => filtrarPorAlcance(supabase.from('quotes').select(columnas as '*')).order('number', { ascending: false }))).map(presupuestoDesdeDb)
     },
     async obtener(id: string) {
-      return presupuestoDesdeDb(errorResult(await supabase.from('quotes').select('*').eq('id', id).single()))
+      return presupuestoDesdeDb(errorResult(await conGanancia((columnas) => supabase.from('quotes').select(columnas as '*').eq('id', id).single())))
     },
     async crear(d: Partial<Presupuesto>) {
       const companyId = await empresaId()
-      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
+      const creado = presupuestoDesdeDb(errorResult(await supabase.from('quotes')
         .insert({ ...presupuestoAColumna(d), company_id: companyId, status: d.estado ?? 'borrador' })
         .select('*').single()))
+      if (d.ganancia !== undefined) { await guardarGanancia(creado.id, d.ganancia); creado.ganancia = d.ganancia }
+      return creado
     },
     async actualizar(id: string, d: Partial<Presupuesto>) {
-      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
+      const actualizado = presupuestoDesdeDb(errorResult(await supabase.from('quotes')
         .update(presupuestoAColumna(d)).eq('id', id).select('*').single()))
+      if (d.ganancia !== undefined) { await guardarGanancia(id, d.ganancia); actualizado.ganancia = d.ganancia }
+      return actualizado
     },
     async cambiarEstado(id: string, estado: Estado) {
       return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
@@ -397,10 +441,17 @@ export const repositorio = {
     permisos: PermisoEmpresa[]
     primerAccesoClaveRespondido: boolean
     terminosAceptados: boolean
+    verGanancias: boolean
   }> {
-    let result = await supabase.from('profiles')
-      .select('company_id,role,name,first_access_password_answered,terms_accepted_at')
+    let result: Respuesta<DbRow> = await supabase.from('profiles')
+      .select('company_id,role,name,first_access_password_answered,terms_accepted_at,can_view_profit')
       .eq('user_id', user.id).single()
+    // Mientras no esté aplicada la migración de ganancias, todos las ven como antes.
+    if (result.error?.code === '42703') {
+      result = await supabase.from('profiles')
+        .select('company_id,role,name,first_access_password_answered,terms_accepted_at')
+        .eq('user_id', user.id).single()
+    }
     // Mientras no esté aplicada la migración de términos, el ingreso no se bloquea.
     let terminosSinColumna = false
     if (result.error?.code === '42703') {
@@ -437,6 +488,7 @@ export const repositorio = {
       permisos,
       primerAccesoClaveRespondido: Boolean(profile.first_access_password_answered),
       terminosAceptados: terminosSinColumna ? terminosAceptadosLocal(user.id) : Boolean(profile.terms_accepted_at),
+      verGanancias: !owner && (profile.role === 'admin' || profile.can_view_profit !== false),
     }
   },
 

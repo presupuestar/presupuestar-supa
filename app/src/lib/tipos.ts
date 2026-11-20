@@ -112,6 +112,8 @@ export interface UsuarioEquipo {
   name?: string
   rol: string
   primerAccesoClaveRespondido?: boolean
+  /** Puede ver las ganancias (el administrador siempre). */
+  verGanancias?: boolean
   empresa: string
   created: string
 }

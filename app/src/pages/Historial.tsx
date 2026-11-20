@@ -246,7 +246,7 @@ export function Historial() {
                     key={r.moneda}
                     titulo={`Estado de presupuestos · ${r.moneda}`}
                     total={importeEnMoneda(r.presupuestado, r.moneda)}
-                    detalle={{ etiqueta: 'Ganancia de aceptados', importe: importeEnMoneda(r.ganancia, r.moneda) }}
+                    detalle={usuario?.verGanancias ? { etiqueta: 'Ganancia de aceptados', importe: importeEnMoneda(r.ganancia, r.moneda) } : undefined}
                     segmentos={[
                       { etiqueta: 'Aceptado', valor: r.aceptado, importe: importeEnMoneda(r.aceptado, r.moneda), color: 'aceptado' },
                       { etiqueta: 'Pendiente', valor: r.pendiente, importe: importeEnMoneda(r.pendiente, r.moneda), color: 'pendiente' },

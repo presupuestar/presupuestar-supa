@@ -15,6 +15,8 @@ export interface UsuarioSesion {
   permisos: PermisoEmpresa[]
   primerAccesoClaveRespondido: boolean
   terminosAceptados: boolean
+  /** Puede ver las ganancias estimadas (el administrador siempre). */
+  verGanancias: boolean
 }
 
 interface Valor {

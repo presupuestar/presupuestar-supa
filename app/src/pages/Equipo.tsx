@@ -34,6 +34,9 @@ export function Equipo() {
   const [clave, setClave] = useState(generarClave())
   const [verClave, setVerClave] = useState(false)
   const [rolNuevoUsuario, setRolNuevoUsuario] = useState('member')
+  // Las ganancias son información sensible: por defecto, un empleado nuevo no las ve.
+  const [verGananciasNuevo, setVerGananciasNuevo] = useState(false)
+  const [gananciasGuardando, setGananciasGuardando] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [roles, setRoles] = useState<RolEmpresa[]>([])
   const [nombreRol, setNombreRol] = useState('')
@@ -56,14 +59,14 @@ export function Equipo() {
     if (clave.length < 8) return setError('La contraseña necesita al menos 8 caracteres.')
     setError(''); setGuardando(true)
     try {
-      await repositorio.usuarios.crear({ name: nombre.trim(), email: email.trim(), password: clave, role: rolNuevoUsuario })
+      await repositorio.usuarios.crear({ name: nombre.trim(), email: email.trim(), password: clave, role: rolNuevoUsuario, verGanancias: verGananciasNuevo })
       void mostrarDatos({
         titulo: `${nombre.trim()} ya puede entrar`,
         mensaje: 'Copiá este mensaje de bienvenida y mandáselo por WhatsApp o correo.',
         datos: mensajeBienvenida({ nombre: nombre.trim(), empresa: empresa?.nombre, email: email.trim(), clave, rol: rolNuevoUsuario }),
         advertencia: advertenciaAcceso(),
       })
-      setNombre(''); setEmail(''); setClave(generarClave()); setVerClave(false); setRolNuevoUsuario('member')
+      setNombre(''); setEmail(''); setClave(generarClave()); setVerClave(false); setRolNuevoUsuario('member'); setVerGananciasNuevo(false)
       await cargar()
     } catch (e) { setError(mensajeError(e, 'No se pudo crear el empleado.')) }
     finally { setGuardando(false) }
@@ -108,6 +111,16 @@ export function Equipo() {
     finally { setRolGuardandoUsuario(null) }
   }
 
+  const cambiarGanancias = async (integrante: UsuarioEquipo, puede: boolean) => {
+    setError(''); setGananciasGuardando(integrante.id)
+    try {
+      await repositorio.usuarios.cambiarVerGanancias(integrante.id, puede)
+      avisar(puede ? `${integrante.name || integrante.email} ahora ve las ganancias.` : `${integrante.name || integrante.email} ya no ve las ganancias.`)
+      await cargar()
+    } catch (e) { setError(mensajeError(e, 'No se pudo cambiar el permiso de ganancias.')) }
+    finally { setGananciasGuardando(null) }
+  }
+
   const eliminar = async (u: UsuarioEquipo) => {
     if (!await confirmar({ titulo: `¿Eliminar a ${u.name || u.email}?`, mensaje: 'Ya no va a poder ingresar. Los presupuestos que hizo se mantienen.', confirmar: 'Eliminar', peligro: true })) return
     try { await repositorio.usuarios.eliminar(u.id); avisar(`${u.name || u.email} ya no forma parte del equipo.`); await cargar() }
@@ -149,6 +162,10 @@ export function Equipo() {
                 <option value="member">Empleado</option>
                 {roles.map((rol) => <option key={rol.id} value={rol.id}>{rol.nombre}</option>)}
               </select>
+            </label>
+            <label className="check fila-completa ganancias-check">
+              <input type="checkbox" checked={verGananciasNuevo} onChange={(e) => setVerGananciasNuevo(e.target.checked)} />
+              <span>Puede ver las ganancias<small>Ve la ganancia estimada de los presupuestos y en el resumen. Se puede cambiar después.</small></span>
             </label>
             <div className="botones izq fila-completa"><button className="btn chico" disabled={guardando}>{guardando ? 'Creando…' : 'Crear empleado'}</button></div>
           </form>
@@ -222,6 +239,13 @@ export function Equipo() {
                         <option value="member">Empleado</option>
                         {roles.map((rol) => <option key={rol.id} value={rol.id}>{rol.nombre}</option>)}
                       </select>
+                    )}
+                    {u.rol !== 'admin' && (
+                      <label className="check ganancias-fila">
+                        <input type="checkbox" checked={Boolean(u.verGanancias)} disabled={gananciasGuardando === u.id}
+                          onChange={(e) => void cambiarGanancias(u, e.target.checked)} />
+                        Ve ganancias
+                      </label>
                     )}
                   </td>
                   <td className="equipo-alta" data-label="Alta">{fechaCorta(u.created)}</td>
