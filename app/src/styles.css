@@ -1708,3 +1708,11 @@ dialog::backdrop{background:rgba(16,24,40,.28);-webkit-backdrop-filter:blur(6px)
   .inicio .resumen-mes .grafico-circular-encabezado p strong{font-size:20px}
   .inicio .resumen-mes .grafico-circular-detalle strong{font-size:17px}
 }
+
+/* Historial en el celular: el cobro va al lado del estado, del mismo tamaño, y el texto
+   («Aceptado hace 2 semanas», «Falta …») pasa a la línea de abajo. */
+@media (max-width:820px){
+  .tabla-historial .campo-estado .estado-sel{order:1;padding:6px 12px;font-size:13px}
+  .tabla-historial .campo-estado .cobro-sel{order:2;margin:0;padding:6px 12px;font-size:13px;border-width:1.5px}
+  .tabla-historial .campo-estado .situacion{order:3;flex-basis:100%}
+}
