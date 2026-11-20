@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { tienePermiso, useSesion } from '../context/Sesion'
 import { repositorio } from '../lib/repositorio'
@@ -153,6 +153,30 @@ function Formulario({ inicial, alNuevo }: { inicial: Presupuesto | null; alNuevo
     setNombre(c?.nombre ?? ''); setEmail(c?.email ?? ''); setTelefono(c?.telefono ?? '')
     setDocumento(c?.documento ?? ''); setDireccion(c?.direccion ?? '')
   }
+
+  // Desde la ficha de un cliente se llega con ?cliente=<id>: el presupuesto arranca con ese cliente.
+  const [parametros] = useSearchParams()
+  const clientePedido = inicial ? '' : parametros.get('cliente') ?? ''
+  useEffect(() => {
+    if (clientesCargados && clientePedido && !clienteSel && clientes.some((c) => c.id === clientePedido)) elegirCliente(clientePedido)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientesCargados])
+
+  // Avisa antes de cerrar o recargar la pestaña si hay un presupuesto a medio armar sin guardar.
+  // Elegir un cliente guardado no cuenta: no hay nada que perder.
+  const firma = JSON.stringify([
+    clienteSel || ![nombre, email, telefono, documento, direccion].some(Boolean) ? '' : [nombre, email, telefono, documento, direccion],
+    lineas.map((l) => [l.descripcion, l.detalle, l.cantidad, l.precio, l.moneda]),
+    notas, plazo, ganancia, ajusteGeneral,
+  ])
+  const firmaInicial = useRef(firma)
+  const sinGuardar = !listo && !guardando && firma !== firmaInicial.current
+  useEffect(() => {
+    if (!sinGuardar) return
+    const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [sinGuardar])
 
   const cambiarLinea = (key: string, cambios: Partial<LineaEdit>) =>
     setLineas((ls) => ls.map((l) => {

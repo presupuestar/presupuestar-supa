@@ -1,6 +1,6 @@
 import { BotonTema } from './BotonTema'
-import { useState, type ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { tienePermiso, useSesion } from '../context/Sesion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { SelloPresupuestar } from './Isotipo'
@@ -8,12 +8,24 @@ import { PrimerAccesoDialog } from './PrimerAccesoDialog'
 import { TerminosDialog } from './TerminosDialog'
 import { EnlacesLegales } from './EnlacesLegales'
 
+/** Nombre de la sección para el título de la pestaña («Historial · Empresa»). */
+const SECCIONES: [string, string][] = [
+  ['/catalogo', 'Catálogo'], ['/nuevo', 'Nuevo presupuesto'], ['/presupuestos/', 'Editar presupuesto'],
+  ['/historial', 'Historial'], ['/clientes', 'Clientes'], ['/equipo', 'Equipo'],
+]
+
 const clase = ({ isActive }: { isActive: boolean }) => (isActive ? 'activo' : '')
 
 /** Barra superior + pie, compartidos por todas las pantallas internas. */
 export function Layout({ children }: { children: ReactNode }) {
   const { usuario, empresa, salir } = useSesion()
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const { pathname } = useLocation()
+  useEffect(() => {
+    const base = empresa?.nombre || 'PresupuestAR'
+    const seccion = SECCIONES.find(([prefijo]) => pathname.startsWith(prefijo))?.[1]
+    document.title = seccion ? `${seccion} · ${base}` : base
+  }, [pathname, empresa?.nombre])
   return (
     <div className="app">
       <header className="barra">

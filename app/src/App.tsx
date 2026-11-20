@@ -25,7 +25,7 @@ function Protegida({ children, permiso, cualquiera }: {
   cualquiera?: PermisoEmpresa[]
 }) {
   const { usuario, cargando, salir } = useSesion()
-  if (cargando) return null
+  if (cargando) return <CargandoPantalla />
   if (!usuario) return <Navigate to="/login" replace />
   if (usuario.rol === 'propietario') return <Navigate to="/login" replace />
   if (permiso && !usuario.permisos.includes(permiso) && usuario.rol !== 'admin') {

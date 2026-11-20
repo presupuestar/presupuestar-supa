@@ -1,7 +1,7 @@
 import { CargandoFilas, EstadoVacio } from '../components/EstadoVacio'
 import { useAvisos } from '../components/Avisos'
 import { useEffect, useId, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { GraficoBarras } from '../components/GraficoBarras'
 import { GraficoCircular, type ColorSegmento } from '../components/GraficoCircular'
@@ -72,8 +72,12 @@ export function Historial() {
   const [lista, setLista] = useState<Presupuesto[] | null>(null)
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
-  const [estado, setEstado] = useState<'todos' | Estado | 'caducado'>('todos')
+  // Desde el aviso de Inicio se llega con ?estado=caducado: se muestran los caducados de cualquier mes.
+  const [parametros] = useSearchParams()
+  const desdeAviso = parametros.get('estado') === 'caducado'
+  const [estado, setEstado] = useState<'todos' | Estado | 'caducado'>(desdeAviso ? 'caducado' : 'todos')
   const [mes, setMes] = useState<string | null>(() => {
+    if (desdeAviso) return null
     const ahora = new Date()
     return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`
   })

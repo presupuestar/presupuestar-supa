@@ -149,7 +149,7 @@ export function Clientes() {
         <div><h1>{selected.nombre}</h1><p className="sub">{[selected.email, selected.telefono].filter(Boolean).join(' · ')}</p></div>
         <div className="encabezado-acciones">
           <button className="btn sec chico" onClick={() => setEditing(selected)}>Editar cliente</button>
-          {tienePermiso(usuario, 'quotes.create') && <Link className="btn chico" to="/nuevo">Nuevo presupuesto</Link>}
+          {tienePermiso(usuario, 'quotes.create') && <Link className="btn chico" to={`/nuevo?cliente=${selected.id}`}>Nuevo presupuesto</Link>}
         </div>
       </div>
       {selected.documento && <p>Documento: {selected.documento}</p>}

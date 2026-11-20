@@ -96,7 +96,7 @@ export function Inicio() {
         {caducados > 0 && (
           <p className="aviso-vigencia" role="alert">
             {caducados === 1 ? 'Hay 1 presupuesto pendiente que superó su fecha de vigencia.' : `Hay ${caducados} presupuestos pendientes que superaron su fecha de vigencia.`}
-            {' '}<Link className="link" to="/historial">Revisarlos en el historial</Link>
+            {' '}<Link className="link" to="/historial?estado=caducado">{caducados === 1 ? 'Revisarlo en el historial' : 'Revisarlos en el historial'}</Link>
           </p>
         )}
 
@@ -162,7 +162,7 @@ export function Inicio() {
                   key={m.moneda}
                   titulo={`Estado de presupuestos · ${normalizarMoneda(m.moneda)}`}
                   total={importeEnMoneda(m.presupuestado, m.moneda)}
-                  detalle={{ etiqueta: 'Ganancia de aceptados', importe: importeEnMoneda(m.ganancia, m.moneda) }}
+                  sinTotales
                   segmentos={[
                     { etiqueta: 'Aceptado', valor: m.aceptado, importe: importeEnMoneda(m.aceptado, m.moneda), color: 'aceptado' },
                     { etiqueta: 'Pendiente', valor: m.pendiente, importe: importeEnMoneda(m.pendiente, m.moneda), color: 'pendiente' },
