@@ -70,6 +70,8 @@ export function Historial() {
     tienePermiso(usuario, 'quotes.delete_own') && (esAdmin || presupuesto.vendedor === usuario?.id)
   const puedeModificar = (presupuesto: Presupuesto) =>
     tienePermiso(usuario, 'quotes.update_own') && (esAdmin || presupuesto.vendedor === usuario?.id)
+  // Registrar un cobro no es editar: lo puede hacer quien emitió el presupuesto o el administrador.
+  const puedeCobrar = (presupuesto: Presupuesto) => esAdmin || presupuesto.vendedor === usuario?.id
   const [lista, setLista] = useState<Presupuesto[] | null>(null)
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -347,7 +349,7 @@ export function Historial() {
                       {opcionesEstado(p.estado).map((o) => <option key={o.valor + o.texto} value={o.valor}>{o.texto}</option>)}
                     </select>}
                     {!presupuestoCaducado(p, empresa?.validezDias, ahora) && situacion(p, empresa?.validezDias, ahora) && <small className="situacion">{situacion(p, empresa?.validezDias, ahora)}</small>}
-                    {sigueCobro(p) && (puedeModificar(p)
+                    {sigueCobro(p) && (puedeCobrar(p)
                       ? <select className={`cobro-sel ${cobroDe(p)}`} value={cobroDe(p)} aria-label={`Cobro del presupuesto ${p.numero}`}
                           onChange={(e) => cambiarCobro(p, e.target.value as Cobro)}>
                           {pasosCobro(p).map((c) => <option key={c} value={c}>{etiquetaCobro(p, c)}</option>)}

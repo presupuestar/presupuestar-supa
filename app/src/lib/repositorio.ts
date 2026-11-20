@@ -421,9 +421,13 @@ export const repositorio = {
       return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
         .update({ status: estado }).eq('id', id).select('*').single()))
     },
+    /** Registra el cobro. No necesita permiso de edición: alcanza con ser quien lo emitió o el administrador. */
     async cambiarCobro(id: string, cobro: Cobro) {
-      return presupuestoDesdeDb(errorResult(await supabase.from('quotes')
-        .update({ payment_status: cobro }).eq('id', id).select('*').single()))
+      const { error } = await supabase.rpc('set_quote_payment', { p_quote_id: id, p_status: cobro })
+      if (!error) return
+      if (error.code !== 'PGRST202') throw Object.assign(new Error(error.message), { code: error.code })
+      // Migración 20261120160000 todavía sin aplicar: como antes.
+      errorResult(await supabase.from('quotes').update({ payment_status: cobro }).eq('id', id).select('id').single())
     },
     async eliminar(id: string) {
       const { data, error } = await supabase.from('quotes').delete().eq('id', id).select('id').maybeSingle()

@@ -65,8 +65,8 @@ export function Inicio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void cargar() }, [usuario, empresa?.validezDias])
 
-  const puedeCobrar = (p: Presupuesto) =>
-    tienePermiso(usuario, 'quotes.update_own') && (usuario?.rol === 'admin' || p.vendedor === usuario?.id)
+  // Registrar un cobro no es editar: lo puede hacer quien emitió el presupuesto o el administrador.
+  const puedeCobrar = (p: Presupuesto) => usuario?.rol === 'admin' || p.vendedor === usuario?.id
   const avanzarCobro = async (p: Presupuesto) => {
     const siguiente = siguienteCobro(p)
     if (!siguiente) return
